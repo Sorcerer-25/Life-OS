@@ -1,0 +1,442 @@
+[
+  {
+    "id": "TC-01",
+    "category": "completed_expense",
+    "input": "I spent ₹250 on lunch today.",
+    "expected_intents": ["expense_logged"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-02",
+    "category": "completed_expense",
+    "input": "Paid 450 rupees for groceries yesterday.",
+    "expected_intents": ["expense_logged"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-03",
+    "category": "completed_expense",
+    "input": "Spent Rs 120 on coffee.",
+    "expected_intents": ["expense_logged"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-04",
+    "category": "completed_expense",
+    "input": "I received a refund of ₹500 yesterday.",
+    "expected_intents": ["expense_logged"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-05",
+    "category": "completed_expense",
+    "input": "Bought books for ₹850 today.",
+    "expected_intents": ["expense_logged"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-06",
+    "category": "planned_expense",
+    "input": "I need to pay my electricity bill of ₹1200 tomorrow.",
+    "expected_intents": ["planned_expense"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-07",
+    "category": "planned_expense",
+    "input": "Plan to spend ₹5000 on weekend shopping.",
+    "expected_intents": ["planned_expense"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-08",
+    "category": "planned_expense",
+    "input": "Have to pay ₹2500 for rent tomorrow.",
+    "expected_intents": ["planned_expense"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-09",
+    "category": "planned_expense",
+    "input": "Will pay wifi bill of ₹800 next Friday.",
+    "expected_intents": ["planned_expense"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-10",
+    "category": "planned_expense",
+    "input": "I must pay insurance premium of ₹4500 tomorrow.",
+    "expected_intents": ["planned_expense"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-11",
+    "category": "reminders",
+    "input": "Remind me to submit my assignment tomorrow at 10 AM.",
+    "expected_intents": ["set_reminder"],
+    "expected_agents": ["reminder_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-12",
+    "category": "reminders",
+    "input": "Remind me to take medication at 8 PM.",
+    "expected_intents": ["set_reminder"],
+    "expected_agents": ["reminder_agent"],
+    "expected_workflow_status": "needs_clarification"
+  },
+  {
+    "id": "TC-13",
+    "category": "reminders",
+    "input": "Remind me to call Mom tomorrow at 6 PM.",
+    "expected_intents": ["set_reminder"],
+    "expected_agents": ["reminder_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-14",
+    "category": "reminders",
+    "input": "Set reminder for team standup tomorrow at 9:30 AM.",
+    "expected_intents": ["set_reminder"],
+    "expected_agents": ["reminder_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-15",
+    "category": "bill_reminders",
+    "input": "Remind me to pay the electricity bill tomorrow for ₹1200.",
+    "expected_intents": ["bill_payment_reminder"],
+    "expected_agents": ["reminder_agent", "finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-16",
+    "category": "bill_reminders",
+    "input": "Remind me to pay internet bill next Friday.",
+    "expected_intents": ["bill_payment_reminder"],
+    "expected_agents": ["reminder_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-17",
+    "category": "bill_reminders",
+    "input": "Remind me to pay water bill tomorrow for ₹350.",
+    "expected_intents": ["bill_payment_reminder"],
+    "expected_agents": ["reminder_agent", "finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-18",
+    "category": "tasks",
+    "input": "Add a task to clean my room.",
+    "expected_intents": ["add_task"],
+    "expected_agents": ["task_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-19",
+    "category": "tasks",
+    "input": "Add task to buy groceries tomorrow.",
+    "expected_intents": ["add_task"],
+    "expected_agents": ["task_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-20",
+    "category": "tasks",
+    "input": "Need to send Rahul the project report by 5 PM.",
+    "expected_intents": ["add_task"],
+    "expected_agents": ["task_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-21",
+    "category": "tasks",
+    "input": "Create task to prepare presentation for Monday.",
+    "expected_intents": ["add_task"],
+    "expected_agents": ["task_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-22",
+    "category": "calendar",
+    "input": "Schedule a project review tomorrow at 3 PM.",
+    "expected_intents": ["schedule_event"],
+    "expected_agents": ["calendar_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-23",
+    "category": "calendar",
+    "input": "Schedule team sync tomorrow at 11 AM.",
+    "expected_intents": ["schedule_event"],
+    "expected_agents": ["calendar_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-24",
+    "category": "calendar",
+    "input": "Calendar meeting with client next Friday at 2 PM.",
+    "expected_intents": ["schedule_event"],
+    "expected_agents": ["calendar_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-25",
+    "category": "multi_intent",
+    "input": "I paid ₹200 for lunch and need to send Rahul the project report by 5 PM.",
+    "expected_intents": ["expense_logged", "add_task"],
+    "expected_agents": ["finance_agent", "task_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-26",
+    "category": "multi_intent",
+    "input": "I spent ₹150 on breakfast and add a task to call landlord.",
+    "expected_intents": ["expense_logged", "add_task"],
+    "expected_agents": ["finance_agent", "task_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-27",
+    "category": "multi_intent",
+    "input": "Remind me to call Rahul tomorrow and submit my assignment on Friday.",
+    "expected_intents": ["set_reminder", "add_task"],
+    "expected_agents": ["reminder_agent", "task_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-28",
+    "category": "multi_intent",
+    "input": "Spent ₹60 on snacks then schedule team standup tomorrow at 10 AM.",
+    "expected_intents": ["expense_logged", "schedule_event"],
+    "expected_agents": ["finance_agent", "calendar_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-29",
+    "category": "multi_intent",
+    "input": "Add a task to clean kitchen and remind me to water plants tomorrow.",
+    "expected_intents": ["add_task", "set_reminder"],
+    "expected_agents": ["task_agent", "reminder_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-30",
+    "category": "multi_intent",
+    "input": "Paid ₹500 for books and remind me to pay electricity bill tomorrow.",
+    "expected_intents": ["expense_logged", "bill_payment_reminder"],
+    "expected_agents": ["finance_agent", "reminder_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-31",
+    "category": "missing_info",
+    "input": "Remind me about the bill.",
+    "expected_intents": ["bill_payment_reminder"],
+    "expected_agents": ["reminder_agent"],
+    "expected_workflow_status": "needs_clarification"
+  },
+  {
+    "id": "TC-32",
+    "category": "missing_info",
+    "input": "Remind me about the payment.",
+    "expected_intents": ["set_reminder"],
+    "expected_agents": ["reminder_agent"],
+    "expected_workflow_status": "needs_clarification"
+  },
+  {
+    "id": "TC-33",
+    "category": "missing_info",
+    "input": "Schedule a review meeting.",
+    "expected_intents": ["schedule_event"],
+    "expected_agents": ["calendar_agent"],
+    "expected_workflow_status": "needs_clarification"
+  },
+  {
+    "id": "TC-34",
+    "category": "missing_info",
+    "input": "My payment of ₹1200 is pending.",
+    "expected_intents": ["planned_expense"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "needs_clarification"
+  },
+  {
+    "id": "TC-35",
+    "category": "missing_info",
+    "input": "Remind me to do it.",
+    "expected_intents": ["set_reminder"],
+    "expected_agents": ["reminder_agent"],
+    "expected_workflow_status": "needs_clarification"
+  },
+  {
+    "id": "TC-36",
+    "category": "partial_workflow",
+    "input": "I paid ₹300 for lunch and remind me about the payment.",
+    "expected_intents": ["expense_logged", "set_reminder"],
+    "expected_agents": ["finance_agent", "reminder_agent"],
+    "expected_workflow_status": "partial"
+  },
+  {
+    "id": "TC-37",
+    "category": "partial_workflow",
+    "input": "Add a task to buy groceries and schedule the meeting.",
+    "expected_intents": ["add_task", "schedule_event"],
+    "expected_agents": ["task_agent", "calendar_agent"],
+    "expected_workflow_status": "partial"
+  },
+  {
+    "id": "TC-38",
+    "category": "partial_workflow",
+    "input": "Spent ₹120 on coffee and remind me about the assignment.",
+    "expected_intents": ["expense_logged", "set_reminder"],
+    "expected_agents": ["finance_agent", "reminder_agent"],
+    "expected_workflow_status": "partial"
+  },
+  {
+    "id": "TC-39",
+    "category": "unsupported",
+    "input": "Find me the cheapest flight to Mumbai.",
+    "expected_intents": [],
+    "expected_agents": [],
+    "expected_workflow_status": "unsupported"
+  },
+  {
+    "id": "TC-40",
+    "category": "unsupported",
+    "input": "Book a flight to Delhi for next week.",
+    "expected_intents": [],
+    "expected_agents": [],
+    "expected_workflow_status": "unsupported"
+  },
+  {
+    "id": "TC-41",
+    "category": "unsupported",
+    "input": "Book a hotel room in Goa for Friday.",
+    "expected_intents": [],
+    "expected_agents": [],
+    "expected_workflow_status": "unsupported"
+  },
+  {
+    "id": "TC-42",
+    "category": "unsupported",
+    "input": "Order a pizza from Dominos.",
+    "expected_intents": [],
+    "expected_agents": [],
+    "expected_workflow_status": "unsupported"
+  },
+  {
+    "id": "TC-43",
+    "category": "unsupported",
+    "input": "Book an Uber to the airport.",
+    "expected_intents": [],
+    "expected_agents": [],
+    "expected_workflow_status": "unsupported"
+  },
+  {
+    "id": "TC-44",
+    "category": "unsupported",
+    "input": "What is the weather in Bangalore today?",
+    "expected_intents": [],
+    "expected_agents": [],
+    "expected_workflow_status": "unsupported"
+  },
+  {
+    "id": "TC-45",
+    "category": "unsupported",
+    "input": "Translate this sentence to French.",
+    "expected_intents": [],
+    "expected_agents": [],
+    "expected_workflow_status": "unsupported"
+  },
+  {
+    "id": "TC-46",
+    "category": "unrecognized",
+    "input": "Blue seven running quickly.",
+    "expected_intents": [],
+    "expected_agents": [],
+    "expected_workflow_status": "rejected"
+  },
+  {
+    "id": "TC-47",
+    "category": "unrecognized",
+    "input": "Random blabbering words without meaning or structure.",
+    "expected_intents": [],
+    "expected_agents": [],
+    "expected_workflow_status": "rejected"
+  },
+  {
+    "id": "TC-48",
+    "category": "unrecognized",
+    "input": "Quantum physics gravitational wave perturbation.",
+    "expected_intents": [],
+    "expected_agents": [],
+    "expected_workflow_status": "rejected"
+  },
+  {
+    "id": "TC-49",
+    "category": "varied_phrasing",
+    "input": "Spent 500 bucks on dinner yesterday.",
+    "expected_intents": ["expense_logged"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "needs_clarification"
+  },
+  {
+    "id": "TC-50",
+    "category": "varied_phrasing",
+    "input": "Paid 300 Rs for cab today.",
+    "expected_intents": ["expense_logged"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-51",
+    "category": "varied_phrasing",
+    "input": "Give me a reminder to take pill tomorrow at 9 AM.",
+    "expected_intents": ["set_reminder"],
+    "expected_agents": ["reminder_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-52",
+    "category": "varied_phrasing",
+    "input": "Make sure I call doctor tomorrow.",
+    "expected_intents": ["set_reminder"],
+    "expected_agents": ["reminder_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-53",
+    "category": "varied_phrasing",
+    "input": "Got a refund of ₹1200 from Amazon.",
+    "expected_intents": ["expense_logged"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-54",
+    "category": "varied_phrasing",
+    "input": "Plan to spend ₹1500 for dinner next Friday.",
+    "expected_intents": ["planned_expense"],
+    "expected_agents": ["finance_agent"],
+    "expected_workflow_status": "ready"
+  },
+  {
+    "id": "TC-55",
+    "category": "varied_phrasing",
+    "input": "Add task clean desk and spent ₹40 on tea.",
+    "expected_intents": ["add_task", "expense_logged"],
+    "expected_agents": ["task_agent", "finance_agent"],
+    "expected_workflow_status": "ready"
+  }
+]

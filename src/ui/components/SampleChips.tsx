@@ -6,14 +6,14 @@ interface SampleChipsProps {
 }
 
 export const SAMPLE_INPUTS = [
-  'I spent ₹250 on lunch today.',
-  'Remind me to pay the electricity bill tomorrow for ₹1200.',
-  'Add a task to clean my room.',
-  'Schedule a project review tomorrow at 3 PM.',
-  'I need to pay my internet bill next Friday.',
-  'I received a refund of ₹500 yesterday.',
-  'My payment of ₹1200 is pending.',
-  'Remind me about the bill.',
+  'Remind me to submit my assignment tomorrow at 10 AM.',
+  'I paid ₹200 for lunch and need to send Rahul the project report by 5 PM.',
+  'I need to pay my electricity bill of ₹1200 tomorrow.',
+  'Remind me about the payment.',
+  'Find me the cheapest flight to Mumbai.',
+  'I paid ₹300 for lunch and remind me about the payment.',
+  'Remind me to call Rahul tomorrow and submit my assignment on Friday.',
+  'Blue seven running quickly.',
 ];
 
 export const SampleChips: React.FC<SampleChipsProps> = ({ onSelectSample }) => {
@@ -43,12 +43,12 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   sectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: '#64748b',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   scroll: {
     paddingRight: 10,
@@ -57,11 +57,11 @@ const styles = StyleSheet.create({
   chip: {
     backgroundColor: '#1e293b',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#334155',
-    maxWidth: 260,
+    maxWidth: 280,
   },
   chipText: {
     color: '#38bdf8',
@@ -69,4 +69,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-

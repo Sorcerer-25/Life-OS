@@ -1,10 +1,10 @@
-import { ActionPlan } from '../models/ActionPlan';
 import { InputEvent } from '../models/InputEvent';
+import { IntentAnalysis } from '../models/IntentAnalysis';
 
 export type IdentificationMethod = 'llm' | 'rule_based' | 'fallback_rule_based';
 
 export interface IdentificationResult {
-  plan: ActionPlan;
+  analysis: IntentAnalysis;
   method: IdentificationMethod;
   warning?: string;
   executionTimeMs?: number;
@@ -13,4 +13,3 @@ export interface IdentificationResult {
 export interface IntentIdentifier {
   identify(input: InputEvent): Promise<IdentificationResult>;
 }
-

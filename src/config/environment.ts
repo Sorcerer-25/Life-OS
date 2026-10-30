@@ -19,7 +19,7 @@ const currentConfig: LifeOsConfig = {
     undefined,
   llmModel:
     (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_LLM_MODEL) ||
-    'gemini-1.5-flash',
+    'gemini-3.8-flash',
   confidenceThreshold: 0.6,
 };
 

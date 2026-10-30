@@ -1,15 +1,6 @@
 import { z } from 'zod';
-import { ActionPlan, AgentName, IntentType } from '../models/ActionPlan';
-
-export const AllowedIntents: [IntentType, ...IntentType[]] = [
-  'expense_logged',
-  'planned_expense',
-  'set_reminder',
-  'bill_payment_reminder',
-  'add_task',
-  'schedule_event',
-  'unknown',
-];
+import { ActionPlan, AgentName } from '../models/ActionPlan';
+import { DetectedIntentSchema } from './intentAnalysisValidator';
 
 export const AllowedAgents: [AgentName, ...AgentName[]] = [
   'reminder_agent',
@@ -29,23 +20,40 @@ export const ActionPlanSourceSchema = z.object({
 
 export const ActionItemSchema = z.object({
   action_id: z.string().min(1, 'action_id cannot be empty'),
+  sequence: z.number().int().positive().default(1),
   agent: z.enum(AllowedAgents),
   operation: z.string().min(1, 'operation cannot be empty'),
   depends_on: z.array(z.string()).default([]),
   data: z.record(z.string(), z.unknown()).default({}),
+  requires_confirmation: z.boolean().default(false),
+  status: z.enum(['ready', 'needs_clarification', 'blocked', 'rejected']).default('ready'),
+  reason: z.string().optional(),
+  clarification_prompt: z.string().optional(),
+});
+
+export const SupervisorDecisionSchema = z.object({
+  workflow_status: z.enum([
+    'ready',
+    'partial',
+    'needs_clarification',
+    'unsupported',
+    'rejected',
+    'completed',
+  ]),
+  reasons: z.array(z.string()).default([]),
+  clarification_needed: z.boolean().default(false),
+  clarification_questions: z.array(z.string()).default([]),
+  unsupported_explanations: z.array(z.string()).default([]),
 });
 
 export const ActionPlanSchema = z.object({
   request_id: z.string().min(1, 'request_id cannot be empty'),
   source: ActionPlanSourceSchema,
-  intent: z.enum(AllowedIntents),
-  confidence: z.number().min(0, 'confidence must be >= 0').max(1, 'confidence must be <= 1'),
-  entities: z.record(z.string(), z.unknown()).default({}),
-  missing_fields: z.array(z.string()).default([]),
+  intents: z.array(DetectedIntentSchema).default([]),
   required_agents: z.array(z.enum(AllowedAgents)).default([]),
   actions: z.array(ActionItemSchema).default([]),
-  requires_confirmation: z.boolean().default(false),
-  execution_mode: z.string().default('pending'),
+  decision: SupervisorDecisionSchema,
+  execution_mode: z.enum(['pending', 'dry_run', 'dispatched']).default('pending'),
 });
 
 export interface ValidationResult {
@@ -91,7 +99,6 @@ export function parseActionPlan(input: unknown): ActionPlan {
  */
 export function cleanAndParseJson(raw: string): unknown {
   let cleaned = raw.trim();
-  // Strip markdown code fences if present
   if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```(?:json)?\s*/i, '');
     cleaned = cleaned.replace(/\s*```$/, '');
@@ -99,4 +106,3 @@ export function cleanAndParseJson(raw: string): unknown {
   }
   return JSON.parse(cleaned);
 }
-

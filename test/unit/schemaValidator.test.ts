@@ -12,35 +12,52 @@ describe('ActionPlan Schema Validator', () => {
       type: 'text',
       raw_input: 'Remind me to pay electricity bill tomorrow for 1200',
       source_app: null,
-      timestamp: '2026-10-27T10:00:00.000Z',
+      timestamp: '2026-10-30T10:00:00.000Z',
     },
-    intent: 'bill_payment_reminder',
-    confidence: 0.95,
-    entities: {
-      bill_type: 'electricity',
-      amount: 1200,
-      currency: 'INR',
-      due_date: '2026-10-28',
-    },
-    missing_fields: [],
+    intents: [
+      {
+        sequence: 1,
+        intent: 'bill_payment_reminder',
+        confidence: 0.95,
+        entities: {
+          bill_type: 'electricity',
+          amount: 1200,
+          currency: 'INR',
+          due_date: '2026-10-31',
+        },
+        missing: [],
+      },
+    ],
     required_agents: ['reminder_agent', 'finance_agent'],
     actions: [
       {
-        action_id: 'act_001',
+        action_id: 'req_001_1_create_reminder',
+        sequence: 1,
         agent: 'reminder_agent',
         operation: 'create_reminder',
         depends_on: [],
         data: { title: 'Pay electricity bill' },
+        requires_confirmation: false,
+        status: 'ready',
       },
       {
-        action_id: 'act_002',
+        action_id: 'req_001_1_create_planned_expense',
+        sequence: 1,
         agent: 'finance_agent',
         operation: 'create_planned_expense',
-        depends_on: ['act_001'],
+        depends_on: ['req_001_1_create_reminder'],
         data: { amount: 1200, currency: 'INR' },
+        requires_confirmation: true,
+        status: 'ready',
       },
     ],
-    requires_confirmation: false,
+    decision: {
+      workflow_status: 'ready',
+      reasons: ['All proposed actions validated successfully.'],
+      clarification_needed: false,
+      clarification_questions: [],
+      unsupported_explanations: [],
+    },
     execution_mode: 'pending',
   };
 
@@ -48,14 +65,7 @@ describe('ActionPlan Schema Validator', () => {
     const result = validateActionPlan(validPlan);
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();
-    expect(result.data?.intent).toBe('bill_payment_reminder');
-  });
-
-  it('rejects an ActionPlan with an unsupported intent', () => {
-    const invalid = { ...validPlan, intent: 'unsupported_intent' };
-    const result = validateActionPlan(invalid);
-    expect(result.success).toBe(false);
-    expect(result.errors?.some((e) => e.includes('intent'))).toBe(true);
+    expect(result.data?.actions).toHaveLength(2);
   });
 
   it('rejects an ActionPlan with an invalid agent name in required_agents', () => {
@@ -71,24 +81,19 @@ describe('ActionPlan Schema Validator', () => {
       actions: [
         {
           action_id: 'act_x',
+          sequence: 1,
           agent: 'invalid_bot',
           operation: 'do_something',
           depends_on: [],
           data: {},
+          requires_confirmation: false,
+          status: 'ready' as const,
         },
       ],
     };
     const result = validateActionPlan(invalid);
     expect(result.success).toBe(false);
     expect(result.errors?.some((e) => e.includes('actions.0.agent'))).toBe(true);
-  });
-
-  it('rejects confidence out of range (> 1.0 or < 0.0)', () => {
-    const high = { ...validPlan, confidence: 1.5 };
-    expect(validateActionPlan(high).success).toBe(false);
-
-    const negative = { ...validPlan, confidence: -0.2 };
-    expect(validateActionPlan(negative).success).toBe(false);
   });
 
   it('rejects an invalid timestamp in source', () => {
@@ -116,4 +121,3 @@ describe('ActionPlan Schema Validator', () => {
     expect(parsedPlain.hello).toBe('plain');
   });
 });
-

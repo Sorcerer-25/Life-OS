@@ -3,10 +3,10 @@ import { IntentService } from '../../src/intent/intentService';
 import { MockLlmProvider } from '../../src/intent/llmProvider';
 import { RuleBasedIdentifier } from '../../src/intent/ruleIdentifier';
 
-describe('IntentService Coordinator', () => {
-  const baseDate = new Date('2026-10-27T10:00:00.000Z');
+describe('IntentService Coordinator (Emits IntentAnalysis)', () => {
+  const baseDate = new Date('2026-10-30T10:00:00.000Z');
 
-  it('runs rule-based identifier directly when set to rules_only mode', async () => {
+  it('runs local rule-based identifier in local_rules or rules_only mode', async () => {
     const mockLlm = new MockLlmProvider();
     const service = new IntentService(mockLlm, new RuleBasedIdentifier(baseDate), baseDate);
     service.setMode('rules_only');
@@ -15,26 +15,22 @@ describe('IntentService Coordinator', () => {
     const result = await service.identify(input);
 
     expect(result.method).toBe('rule_based');
-    expect(result.plan.intent).toBe('expense_logged');
-    expect(result.plan.entities.amount).toBe(250);
-    // Verified that LLM was not called
+    expect(result.analysis.intents[0].intent).toBe('expense_logged');
+    expect(result.analysis.intents[0].entities.amount).toBe(250);
     expect(mockLlm.callCount).toBe(0);
   });
 
-  it('falls back to rule-based engine when in auto mode and LLM provider is unconfigured', async () => {
+  it('routes to deterministic local engine without network calls', async () => {
     const mockLlm = new MockLlmProvider();
     mockLlm.configured = false;
 
     const service = new IntentService(mockLlm, new RuleBasedIdentifier(baseDate), baseDate);
-    service.setMode('auto');
 
     const input = createTextInputEvent('Remind me to pay the electricity bill tomorrow for ₹1200.');
     const result = await service.identify(input);
 
-    expect(result.method).toBe('fallback_rule_based');
-    expect(result.plan.intent).toBe('bill_payment_reminder');
-    expect(result.warning).toBeDefined();
+    expect(result.method).toBe('rule_based');
+    expect(result.analysis.intents[0].intent).toBe('bill_payment_reminder');
     expect(mockLlm.callCount).toBe(0);
   });
 });
-

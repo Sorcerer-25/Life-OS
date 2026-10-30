@@ -1,32 +1,19 @@
-import { Config } from '../config/environment';
 import { InputEvent } from '../models/InputEvent';
 import { IdentificationResult, IntentIdentifier } from './identifier';
-import { LlmIntentIdentifier } from './llmIdentifier';
-import { GeminiProvider, LlmProvider } from './llmProvider';
-import { RuleBasedIdentifier } from './ruleIdentifier';
+import { LocalIntentIdentifier } from './localIntentIdentifier';
 
-export type IntentEngineMode = 'auto' | 'llm' | 'rules_only';
+export type IntentEngineMode = 'local_rules' | 'auto' | 'rules_only' | 'llm';
 
 export class IntentService implements IntentIdentifier {
-  private llmIdentifier: LlmIntentIdentifier;
-  private ruleIdentifier: RuleBasedIdentifier;
-  private mode: IntentEngineMode = 'auto';
+  private localIdentifier: LocalIntentIdentifier;
+  private mode: IntentEngineMode = 'local_rules';
 
   constructor(
-    llmProvider?: LlmProvider,
-    ruleIdentifier?: RuleBasedIdentifier,
+    _llmProvider?: unknown,
+    _ruleIdentifier?: unknown,
     baseDate?: Date
   ) {
-    this.ruleIdentifier = ruleIdentifier || new RuleBasedIdentifier(baseDate);
-
-    const provider =
-      llmProvider ||
-      new GeminiProvider(
-        () => Config.getGeminiApiKey(),
-        () => Config.getLlmModel()
-      );
-
-    this.llmIdentifier = new LlmIntentIdentifier(provider, this.ruleIdentifier, baseDate);
+    this.localIdentifier = new LocalIntentIdentifier(baseDate);
   }
 
   public setMode(mode: IntentEngineMode): void {
@@ -38,29 +25,13 @@ export class IntentService implements IntentIdentifier {
   }
 
   public async identify(input: InputEvent): Promise<IdentificationResult> {
-    if (this.mode === 'rules_only') {
-      const res = await this.ruleIdentifier.identify(input);
-      return {
-        ...res,
-        method: 'rule_based',
-        warning: 'Engine running in explicit rules-only mode.',
-      };
-    }
-
-    if (this.mode === 'llm' && !Config.isLlmConfigured()) {
-      const res = await this.ruleIdentifier.identify(input);
-      return {
-        ...res,
-        method: 'fallback_rule_based',
-        warning: 'LLM mode selected but API key is missing. Used rule-based fallback.',
-      };
-    }
-
-    // 'auto' or 'llm' with configured provider
-    return await this.llmIdentifier.identify(input);
+    const res = await this.localIdentifier.identify(input);
+    return {
+      ...res,
+      method: 'rule_based',
+    };
   }
 }
 
 // Default application instance
 export const defaultIntentService = new IntentService();
-
