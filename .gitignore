@@ -43,3 +43,6 @@ env.json
 # generated native folders
 /ios
 /android
+
+#files
+/commands.md
