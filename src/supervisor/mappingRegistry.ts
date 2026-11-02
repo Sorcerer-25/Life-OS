@@ -1,5 +1,6 @@
 import { AgentName } from '../models/ActionPlan';
 import { SupportedIntent } from '../models/IntentAnalysis';
+import { isCreateCalendarEventForTasksEnabled } from '../calendar/calendarSettings';
 
 export interface OperationMapping {
   operation: string;
@@ -58,6 +59,15 @@ export const SUPERVISOR_MAPPING_REGISTRY: Record<SupportedIntent, OperationMappi
       operation: 'create_task',
       agent: 'task_agent',
       requiredEntities: ['title'],
+      requiresConfirmation: false,
+    },
+    {
+      operation: 'create_event',
+      agent: 'calendar_agent',
+      condition: (entities) =>
+        Boolean(entities.due_date && (entities.start_time || entities.time_text)) &&
+        isCreateCalendarEventForTasksEnabled(),
+      requiredEntities: ['title', 'due_date'],
       requiresConfirmation: false,
     },
   ],

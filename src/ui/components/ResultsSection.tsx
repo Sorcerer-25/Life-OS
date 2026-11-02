@@ -1,21 +1,58 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { CalendarAgent } from '../../calendar/calendarAgent';
 import { IdentificationResult } from '../../intent/identifier';
-import { ActionPlan } from '../../models/ActionPlan';
+import { ActionItem, ActionPlan } from '../../models/ActionPlan';
+import { AgentResult } from '../../models/AgentResult';
 
 interface ResultsSectionProps {
   analysisResult: IdentificationResult;
   actionPlan?: ActionPlan;
+  calendarAgent?: CalendarAgent;
 }
+
+const defaultCalendarAgent = new CalendarAgent();
 
 export const ResultsSection: React.FC<ResultsSectionProps> = ({
   analysisResult,
   actionPlan,
+  calendarAgent = defaultCalendarAgent,
 }) => {
   const [showAnalysisJson, setShowAnalysisJson] = useState<boolean>(false);
   const [showPlanJson, setShowPlanJson] = useState<boolean>(false);
+  const [calendarResults, setCalendarResults] = useState<Record<string, AgentResult>>({});
+  const [executingActions, setExecutingActions] = useState<Record<string, boolean>>({});
 
   const { analysis, method, warning, executionTimeMs } = analysisResult;
+
+  const handleExecuteCalendarAction = async (action: ActionItem) => {
+    setExecutingActions((prev) => ({ ...prev, [action.action_id]: true }));
+    try {
+      const result = await calendarAgent.execute({
+        taskId: `task_${Date.now()}`,
+        requestId: actionPlan?.request_id || analysis.request_id,
+        actionId: action.action_id,
+        agentName: 'calendar_agent',
+        operation: action.operation,
+        data: action.data as unknown as Record<string, unknown>,
+      });
+      setCalendarResults((prev) => ({ ...prev, [action.action_id]: result }));
+    } catch (err: any) {
+      setCalendarResults((prev) => ({
+        ...prev,
+        [action.action_id]: {
+          taskId: `err_${Date.now()}`,
+          actionId: action.action_id,
+          agentName: 'calendar_agent',
+          status: 'failure',
+          message: err?.message || 'Execution error',
+          error: err?.message,
+        },
+      }));
+    } finally {
+      setExecutingActions((prev) => ({ ...prev, [action.action_id]: false }));
+    }
+  };
 
   const renderWorkflowStatusBadge = (status?: string) => {
     switch (status) {
@@ -354,6 +391,103 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                       {JSON.stringify(act.data, null, 2)}
                     </Text>
                   </View>
+
+                  {/* Native Calendar Execution Card for calendar_agent */}
+                  {act.agent === 'calendar_agent' && (
+                    <View style={styles.calendarExecBox}>
+                      <View style={styles.rowBetween}>
+                        <Text style={styles.calendarExecTitle}>🗓️ Android Calendar Provider</Text>
+                        {calendarResults[act.action_id] && (
+                          <View
+                            style={[
+                              styles.calendarExecBadge,
+                              calendarResults[act.action_id].status === 'success'
+                                ? styles.execBadgeSuccess
+                                : styles.execBadgeFail,
+                            ]}
+                          >
+                            <Text style={styles.calendarExecBadgeText}>
+                              {calendarResults[act.action_id].status.toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {calendarResults[act.action_id] ? (
+                        <View style={styles.execDetails}>
+                          <Text style={styles.execMessage}>
+                            {calendarResults[act.action_id].message}
+                          </Text>
+
+                          {calendarResults[act.action_id].output?.android_event_id ? (
+                            <View style={styles.execMetaRow}>
+                              <Text style={styles.execMetaLabel}>Android Event ID:</Text>
+                              <Text style={styles.execMetaVal}>
+                                {String(calendarResults[act.action_id].output?.android_event_id)}
+                              </Text>
+                            </View>
+                          ) : null}
+
+                          {calendarResults[act.action_id].output?.calendar_id ? (
+                            <View style={styles.execMetaRow}>
+                              <Text style={styles.execMetaLabel}>Calendar ID:</Text>
+                              <Text style={styles.execMetaVal}>
+                                {String(calendarResults[act.action_id].output?.calendar_id)}
+                              </Text>
+                            </View>
+                          ) : null}
+
+                          <View style={styles.execMetaRow}>
+                            <Text style={styles.execMetaLabel}>Provider Verification:</Text>
+                            <Text
+                              style={[
+                                styles.execMetaVal,
+                                calendarResults[act.action_id].output?.verified_in_provider
+                                  ? styles.verifiedTrue
+                                  : styles.verifiedFalse,
+                              ]}
+                            >
+                              {calendarResults[act.action_id].output?.verified_in_provider
+                                ? '✓ Verified in native provider'
+                                : '✕ Not verified'}
+                            </Text>
+                          </View>
+
+                          {calendarResults[act.action_id].output?.duplicate ? (
+                            <View style={styles.duplicateNotice}>
+                              <Text style={styles.duplicateNoticeText}>
+                                ⚡ Duplicate request — returned existing device event without re-inserting.
+                              </Text>
+                            </View>
+                          ) : null}
+
+                          {(calendarResults[act.action_id].output?.defaults_applied as any)
+                            ?.default_end_time ? (
+                            <View style={styles.defaultsNotice}>
+                              <Text style={styles.defaultsNoticeText}>
+                                ℹ️ Applied default duration (60 minutes) because end time was not specified.
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[
+                            styles.execBtn,
+                            executingActions[act.action_id] && styles.execBtnDisabled,
+                          ]}
+                          disabled={executingActions[act.action_id] || act.status === 'blocked'}
+                          onPress={() => handleExecuteCalendarAction(act)}
+                        >
+                          <Text style={styles.execBtnText}>
+                            {executingActions[act.action_id]
+                              ? '⏳ Inserting into Calendar...'
+                              : '📅 Insert into Device Calendar'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                 </View>
               ))
             )}
@@ -872,5 +1006,103 @@ const styles = StyleSheet.create({
     color: '#a5f3fc',
     fontSize: 11,
     lineHeight: 16,
+  },
+  calendarExecBox: {
+    marginTop: 10,
+    backgroundColor: '#0f172a',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#38bdf8',
+  },
+  calendarExecTitle: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  calendarExecBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  execBadgeSuccess: {
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+    borderWidth: 1,
+    borderColor: '#22c55e',
+  },
+  execBadgeFail: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+  },
+  calendarExecBadgeText: {
+    color: '#f8fafc',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  execDetails: {
+    marginTop: 8,
+    gap: 6,
+  },
+  execMessage: {
+    color: '#cbd5e1',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  execMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  execMetaLabel: {
+    color: '#94a3b8',
+    fontSize: 11,
+  },
+  execMetaVal: {
+    color: '#f8fafc',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  verifiedTrue: {
+    color: '#4ade80',
+  },
+  verifiedFalse: {
+    color: '#f87171',
+  },
+  duplicateNotice: {
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    padding: 6,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  duplicateNoticeText: {
+    color: '#fde047',
+    fontSize: 11,
+  },
+  defaultsNotice: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    padding: 6,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  defaultsNoticeText: {
+    color: '#7dd3fc',
+    fontSize: 11,
+  },
+  execBtn: {
+    backgroundColor: '#0284c7',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  execBtnDisabled: {
+    backgroundColor: '#475569',
+  },
+  execBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

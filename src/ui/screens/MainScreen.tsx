@@ -8,17 +8,21 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { CalendarAgent } from '../../calendar/calendarAgent';
 import { createTextInputEvent } from '../../input/inputCapture';
 import { IdentificationResult } from '../../intent/identifier';
 import { defaultIntentService } from '../../intent/intentService';
 import { ActionPlan } from '../../models/ActionPlan';
 import { SupervisorAgent } from '../../supervisor/supervisor';
+import { CalendarSettingsModal } from '../components/CalendarSettingsModal';
+import { CreatedEventsModal } from '../components/CreatedEventsModal';
 import { Header } from '../components/Header';
 import { ResultsSection } from '../components/ResultsSection';
 import { SampleChips } from '../components/SampleChips';
 import { TextInputSection } from '../components/TextInputSection';
 
 const supervisor = new SupervisorAgent(0.6);
+const calendarAgent = new CalendarAgent();
 
 export const MainScreen: React.FC = () => {
   const [inputText, setInputText] = useState<string>('');
@@ -26,6 +30,8 @@ export const MainScreen: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<IdentificationResult | null>(null);
   const [actionPlan, setActionPlan] = useState<ActionPlan | null>(null);
+  const [showCalendarSettings, setShowCalendarSettings] = useState<boolean>(false);
+  const [showCreatedEvents, setShowCreatedEvents] = useState<boolean>(false);
 
   const handleSelectSample = (sample: string) => {
     setInputText(sample);
@@ -80,7 +86,10 @@ export const MainScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <Header />
+          <Header
+            onOpenCalendarSettings={() => setShowCalendarSettings(true)}
+            onOpenCreatedEvents={() => setShowCreatedEvents(true)}
+          />
 
           {/* Test Acceptance Sample Chips */}
           <SampleChips onSelectSample={handleSelectSample} />
@@ -103,10 +112,24 @@ export const MainScreen: React.FC = () => {
             <ResultsSection
               analysisResult={analysisResult}
               actionPlan={actionPlan || undefined}
+              calendarAgent={calendarAgent}
             />
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Calendar Settings Modal */}
+      <CalendarSettingsModal
+        visible={showCalendarSettings}
+        onClose={() => setShowCalendarSettings(false)}
+      />
+
+      {/* Created Events & Management Modal */}
+      <CreatedEventsModal
+        visible={showCreatedEvents}
+        onClose={() => setShowCreatedEvents(false)}
+        calendarAgent={calendarAgent}
+      />
     </SafeAreaView>
   );
 };

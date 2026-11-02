@@ -1,125 +1,124 @@
-# LifeOS (Phase 1 Prototype)
+# LifeOS: Event-Driven Multi-Agent Personal Workflow Orchestration
 
 LifeOS is an event-driven, multi-agent personal workflow orchestration mobile platform built for Android using React Native and TypeScript.
 
-In Phase 1, LifeOS converts raw multimodal inputs (text, voice transcripts, simulated notifications) into standardized, app-independent **ActionPlans** via an **Intent Identifier**, validated and coordinated deterministically before agent dispatch.
+Raw inputs (typed text, voice transcripts, notifications) are turned into a standardized, app-independent intent representation by an **Intent Identifier**, validated and coordinated deterministically by a **Supervisor Agent**, which constructs a typed **ActionPlan** and dispatches actions to internal agents.
 
 ---
 
-## Architecture Overview
+## Architecture Pipeline
 
 ```
-Raw Input (Text / Voice / Notification)
-             │
-             ▼
-      [Input Capture]  ─── produces ───>  InputEvent
-             │
-             ▼
-    [Intent Identifier]
-   ┌─────────────────────────────────────────────────────────┐
-   │ 1. LLM-Based Identifier (Google Gemini)                 │
-   │ 2. Schema Validator (Zod validation & normalization)    │
-   │ 3. Automatic Rule-Based Fallback (Offline/deterministic) │
-   └─────────────────────────────────────────────────────────┘
-             │
-             ▼
-        ActionPlan (Normalized JSON Proposal)
-             │
-             ▼
-       [Results UI] (Transparent reasoning, entities, actions, missing fields)
+Raw Input (Text / Simulated Notifications)
+            │
+            ▼
+     [Input Capture]  ─── produces ───>  InputEvent
+            │
+            ▼
+    [Local Intent Identifier]  (100% Offline & Deterministic)
+            │
+            ▼
+      IntentAnalysis  (What does the user want? No agent knowledge)
+            │
+            ▼
+     [Supervisor Agent]  (How should it be executed? Owns registry & policies)
+            │
+            ▼
+        ActionPlan  (Typed action graph with deterministic action IDs)
+            │
+            ▼
+     [Calendar Agent]  ──>  [Calendar Adapter]  ──>  [Android CalendarProvider]
+            │
+            ▼
+    Execution Result & SQLite Idempotency Mapping
 ```
 
 ---
 
-## Supported Intents
+## Android Native Calendar Integration (Calendar Agent & Adapter)
 
-1. `expense_logged`: Completed transaction (e.g. *"I spent ₹250 on lunch today"*, *"I received a refund of ₹500 yesterday"*). Dispatches to `finance_agent` (`create_expense`).
-2. `planned_expense`: Intended or upcoming expense. Dispatches to `finance_agent` (`create_planned_expense`).
-3. `set_reminder`: General reminder with relative/absolute date & time. Dispatches to `reminder_agent` (`create_reminder`).
-4. `bill_payment_reminder`: Utility/recurring bill payment. Multi-agent coordination: dispatches to both `reminder_agent` (`create_reminder`) and `finance_agent` (`create_planned_expense`).
-5. `add_task`: Actionable task/todo item. Dispatches to `task_agent` (`create_task`).
-6. `schedule_event`: Calendar event with date & time. Dispatches to `calendar_agent` (`schedule_event`).
-7. `unknown`: Ambiguous, incomplete, or unrecognized input.
+LifeOS integrates with Android's native calendar provider (`android.provider.CalendarContract`) using `expo-calendar` behind an abstract `CalendarAdapter` interface.
+
+### 1. Constraints & Honest Sync Transparency
+- **No Google Calendar REST API, OAuth, or Firebase**: LifeOS writes directly to Android's local content provider.
+- **Honest Sync Reporting**: An insert into a Google-backed calendar writes to Android's native provider on the device. LifeOS transparently reports:
+  > *"Inserted into &lt;calendar&gt;; Google sync depends on the account sync settings."*
+  Cloud synchronization with Google Calendar on the web is performed asynchronously by Android's system sync service, not by LifeOS.
+- **No Duplicate Event Storage**: SQLite does not store a duplicate copy of calendar event bodies. It only stores the LifeOS-to-Android mapping (`action_id`, `request_id`, `android_event_id`, `calendar_id`, `status`, timestamps, and errors).
+
+### 2. Idempotency & Crash Recovery (SQLite Mapping)
+LifeOS enforces strict idempotency using deterministic action IDs (e.g. `req_001_1_create_event`):
+1. **Existing Check**: Before creating an event, LifeOS looks up `action_id` in SQLite. If `status === 'created'` and the event still exists on the device, it returns `success` with `duplicate: true` and the existing event ID without creating a duplicate.
+2. **External Deletion Detection**: If the event was previously created by LifeOS but has since been deleted outside LifeOS (e.g. user deleted it in Google Calendar), LifeOS reports `event_not_found` and does **not** silently recreate it.
+3. **Crash Recovery**: If an event insertion crashed midway, a `pending` row exists in SQLite. On retry, LifeOS searches the destination calendar for the marker `[LifeOS action_id: <action_id>]`. If found, it recovers the event without re-inserting.
+4. **Insertion Flow**: Writes a `pending` row $\rightarrow$ Inserts event with marker $\rightarrow$ Reads event back to verify in provider $\rightarrow$ Updates row to `created`.
+
+### 3. Permissions Policy
+- Calendar permissions (`READ_CALENDAR`, `WRITE_CALENDAR`) are **never** requested at app startup. They are requested only when a calendar action needs them.
+- Permission states handled: `granted`, `denied`, and `denied_permanently` (offers to open Android system settings).
+- A denied permission returns a structured failure with `permission_denied` without crashing the app.
+
+### 4. Calendar Selection & Writable Filtering
+- LifeOS queries all device calendars and filters destination choices strictly to writable calendars (`allowsModifications === true` and access level is not read-only).
+- The user can select their preferred destination calendar, which is persisted.
+- If no writable calendar exists, the Supervisor returns `needs_clarification` with reason `no_writable_calendar`.
+
+### 5. Event Updates & Deletions
+- **Update**: Allowed only for events LifeOS created (verified in SQLite mapping).
+- **Delete**: Allowed only for events LifeOS created. Deletion requires explicit user confirmation via an Android confirmation dialog before removing from `CalendarContract`.
+
+### 6. Task Calendar Sync Flag
+- Tasks default to local storage. An optional toggle (`createCalendarEventForTasks`) allows tasks with a due date and start time to also schedule a calendar event. The UI explicitly clarifies that calendar events are not tasks (no completion state).
 
 ---
 
-## Safety & Integrity Rules
+## Native Build Requirements (Expo Go vs Development Build)
 
-- **Pending Payment Protection**: A notification or text stating a payment is pending (*"My payment of ₹1200 is pending"*) is **never** classified as a completed expense (`expense_logged` or `create_expense`).
-- **No Hallucination**: Dates, times, amounts, and durations are never invented. Missing data is flagged in `missing_fields` and lowers confidence.
-- **Model-Reported Confidence**: Confidence is explicitly labeled as *model-reported* and kept distinct from measured evaluation metrics.
-- **Strict Schema Validation**: All LLM and rule outputs are validated at runtime against the Zod ActionPlan schema.
+- **Expo SDK Version**: `58.0.19` (React Native `0.88.0`).
+- **Native Permissions**: `expo-calendar` requires native Android permissions `READ_CALENDAR` and `WRITE_CALENDAR`, accessing `android.provider.CalendarContract` via Android Content Resolver.
+- **Expo Go Limitation**: Modern Expo Go does not bundle native calendar permissions. Running native calendar operations on an Android device or emulator requires a **development build** (or prebuild).
 
----
+### How to Run:
 
-## Getting Started
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) (v18+)
-- [npm](https://www.npmjs.com/) or [npx](https://www.npmjs.com/package/npx)
-- Android device or emulator with Expo Go / Expo development build
-
-### 1. Installation
-
+#### Option A: Local Android Development Build (Emulator or USB Device)
+Ensure Android Studio and ADB are installed and an emulator is running:
 ```bash
-git clone <repo-url>
-cd Life-OS
-npm install
+npx expo run:android
 ```
 
-### 2. Configure the API Key
-
-Create a `.env` file from `.env.example`:
-
+#### Option B: Cloud Development Build with EAS
 ```bash
-cp .env.example .env
+npx eas-cli@latest build --profile development --platform android
 ```
-
-Add your Google Gemini API key:
-
-```env
-EXPO_PUBLIC_GEMINI_API_KEY=your_actual_gemini_api_key_here
-EXPO_PUBLIC_LLM_MODEL=gemini-1.5-flash
-```
-
-> **Security Note**: In Phase 1 client prototyping, keys can be set via `.env` or using the in-app **⚙️ Configure Key** button. In production mobile applications, LLM calls **must** route through a secure backend proxy to prevent exposing API credentials on client devices.
-
-If no API key is provided, the app continues to work with the **deterministic rule-based identifier** with zero degradation in offline capability.
-
-### 3. Run the App
-
-Start the Expo development server:
-
+Install the generated `.apk` on your device and start the local bundler:
 ```bash
-npm start
+npx expo start --dev-client
 ```
 
-Press `a` to open on an Android emulator or scan the QR code using Expo Go on your physical Android phone.
+---
 
-### 4. Running Unit Tests
+## Running Automated Tests
 
-Run all unit tests using Jest:
+All calendar operations, mock adapters, mapping persistence, idempotency, and supervisor workflows are covered by comprehensive unit tests:
 
 ```bash
 npm test
 ```
 
----
-
-## Component Status (Phase 1 — Step 2)
-
-| Component | Status | Implementation Details |
-|---|---|---|
-| **Input Capture** | ✅ Implemented | Creates normalized `InputEvent` with unique `requestId`, ISO timestamp, and source metadata. |
-| **Schema Validator** | ✅ Implemented | Runtime validation using Zod; validates intents, agents, ISO dates, dependencies, and formats. |
-| **Rule-Based Identifier** | ✅ Implemented | Deterministic regex & keyword extraction, date/time resolution, multi-agent logic, safety guards. |
-| **LLM-Based Identifier** | ✅ Implemented | Decoupled `GeminiProvider` behind `LlmProvider` interface, 1-retry self-correction, JSON schema prompt. |
-| **Identifier Coordinator** | ✅ Implemented | Seamless fallback: tries LLM if configured; automatically falls back to rule-based engine on failure. |
-| **Results UI** | ✅ Implemented | Complete 7-part ordered UI showing input, intent, confidence, entities, agents, actions, missing fields, and raw plan JSON. |
-| **Supervisor Agent** | ⏳ Mock / Step 3 | Validation, dependency resolution, duplicate protection, and mock agent dispatch. |
-| **Mock Agents** | ⏳ Mock / Step 3 | `ReminderAgent`, `FinanceAgent`, `TaskAgent`, `CalendarAgent` (mock returns only, no external APIs). |
-| **SQLite History** | ⏳ Step 4 | Local persistence of past requests. |
-| **Voice STT** | ⏳ Step 5 | Android speech-to-text. |
-| **Simulated Notifications** | ⏳ Step 6 | Bank & bill alert simulation. |
-
+### Test Suites Included:
+1. `test/unit/calendarAgent.test.ts`:
+   - Event creation & marker embedding
+   - Idempotency & duplicate detection
+   - External deletion detection (never silently recreates)
+   - Crash recovery from pending row
+   - Missing end time default (start + 60m)
+   - Missing start time clarification (never guesses)
+   - Permission denial handling
+   - No writable calendar handling
+   - Provider internal error recovery
+   - Event update & confirmation-based deletion
+   - Task calendar sync configuration flag
+2. `test/unit/calendarAdapter.test.ts`: Adapter operations & honest source metadata
+3. `test/unit/acceptanceTests.test.ts`: 8 Phase 1.5 acceptance tests
+4. `test/evaluation/evaluation.test.ts`: 55-example evaluation dataset (100% accuracy)
+5. Existing core unit tests: `inputCapture`, `intentAnalysisValidator`, `schemaValidator`, `ruleIdentifier`, `llmIdentifier`, `intentService`.

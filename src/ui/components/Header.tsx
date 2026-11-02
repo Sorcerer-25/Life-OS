@@ -1,23 +1,45 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onOpenCalendarSettings?: () => void;
+  onOpenCreatedEvents?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({
+  onOpenCalendarSettings,
+  onOpenCreatedEvents,
+}) => {
   return (
     <View style={styles.container}>
       <View style={styles.titleRow}>
         <Text style={styles.title}>LifeOS</Text>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>Phase 1.5A Prototype</Text>
+          <Text style={styles.badgeText}>Calendar Integration</Text>
         </View>
       </View>
       <Text style={styles.subtitle}>
-        Event-driven personal workflow orchestration. Deterministic local intent understanding and supervisor action planning.
+        Event-driven personal workflow orchestration. Deterministic local intent understanding, supervisor action planning, and Android native calendar provider integration.
       </Text>
       <View style={styles.statusRow}>
         <View style={styles.dot} />
         <Text style={styles.statusText}>
-          Processing Mode: <Text style={styles.boldText}>LOCAL RULE-BASED</Text> (Offline & Fast)
+          Processing Mode: <Text style={styles.boldText}>LOCAL DETERMINISTIC</Text>
         </Text>
+      </View>
+
+      {/* Navigation Buttons for Calendar Features */}
+      <View style={styles.navRow}>
+        {onOpenCalendarSettings && (
+          <TouchableOpacity style={styles.navButton} onPress={onOpenCalendarSettings}>
+            <Text style={styles.navButtonText}>⚙️ Calendar Settings</Text>
+          </TouchableOpacity>
+        )}
+        {onOpenCreatedEvents && (
+          <TouchableOpacity style={styles.navButton} onPress={onOpenCreatedEvents}>
+            <Text style={styles.navButtonText}>🗓️ Created Events</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -83,5 +105,25 @@ const styles = StyleSheet.create({
   boldText: {
     fontWeight: '700',
     color: '#34d399',
+  },
+  navRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  navButton: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  navButtonText: {
+    color: '#cbd5e1',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
