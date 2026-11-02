@@ -7,6 +7,8 @@ module.exports = {
     '^expo-calendar/legacy$': '<rootDir>/test/mocks/expo-calendar-mock.ts',
     '^expo-calendar$': '<rootDir>/test/mocks/expo-calendar-mock.ts',
     '^expo-sqlite$': '<rootDir>/test/mocks/expo-sqlite-mock.ts',
+    '^expo-speech-recognition$': '<rootDir>/test/mocks/expo-speech-recognition-mock.ts',
+    '^react-native$': '<rootDir>/test/mocks/react-native-mock.ts',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: { strict: true, types: ['jest'] } }],

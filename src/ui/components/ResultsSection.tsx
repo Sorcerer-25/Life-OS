@@ -118,7 +118,31 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
         </View>
         <View style={styles.row}>
           <Text style={styles.fieldLabel}>Source Type:</Text>
-          <Text style={styles.fieldValue}>{analysis.source.type.toUpperCase()}</Text>
+          <View style={styles.sourceBadgeContainer}>
+            <View
+              style={[
+                styles.sourceTagBadge,
+                analysis.source.type === 'voice'
+                  ? styles.sourceTagVoice
+                  : analysis.source.type === 'notification'
+                  ? styles.sourceTagNotification
+                  : styles.sourceTagText,
+              ]}
+            >
+              <Text style={styles.sourceTagTextLabel}>
+                {analysis.source.type === 'voice'
+                  ? '🎤 VOICE'
+                  : analysis.source.type === 'notification'
+                  ? '🔔 NOTIFICATION'
+                  : '⌨️ TEXT'}
+              </Text>
+            </View>
+            {analysis.source.source_app ? (
+              <View style={styles.sourceAppTag}>
+                <Text style={styles.sourceAppText}>App: {analysis.source.source_app}</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
         <View style={styles.row}>
           <Text style={styles.fieldLabel}>Request ID:</Text>
@@ -1104,5 +1128,42 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  sourceBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sourceTagBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  sourceTagText: {
+    backgroundColor: '#1e293b',
+  },
+  sourceTagVoice: {
+    backgroundColor: '#0369a1',
+  },
+  sourceTagNotification: {
+    backgroundColor: '#7c2d12',
+  },
+  sourceTagTextLabel: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  sourceAppTag: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  sourceAppText: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '600',
   },
 });

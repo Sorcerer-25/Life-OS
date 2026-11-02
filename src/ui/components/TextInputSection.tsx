@@ -14,6 +14,7 @@ interface TextInputSectionProps {
   onAnalyze: () => void;
   isLoading: boolean;
   onClear: () => void;
+  onOpenVoiceModal?: () => void;
   errorMessage?: string | null;
 }
 
@@ -23,6 +24,7 @@ export const TextInputSection: React.FC<TextInputSectionProps> = ({
   onAnalyze,
   isLoading,
   onClear,
+  onOpenVoiceModal,
   errorMessage,
 }) => {
   return (
@@ -66,6 +68,17 @@ export const TextInputSection: React.FC<TextInputSectionProps> = ({
             Clear
           </Text>
         </TouchableOpacity>
+
+        {onOpenVoiceModal && (
+          <TouchableOpacity
+            style={styles.voiceButton}
+            onPress={onOpenVoiceModal}
+            disabled={isLoading}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.voiceButtonText}>🎤 Voice</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.analyzeButton, (!inputText.trim() || isLoading) && styles.buttonDisabled]}
@@ -150,7 +163,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     marginTop: 10,
-    gap: 10,
+    gap: 8,
   },
   clearButton: {
     paddingHorizontal: 10,
@@ -163,6 +176,21 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     color: '#475569',
+  },
+  voiceButton: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#0284c7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceButtonText: {
+    color: '#38bdf8',
+    fontSize: 13,
+    fontWeight: '700',
   },
   analyzeButton: {
     backgroundColor: '#38bdf8',

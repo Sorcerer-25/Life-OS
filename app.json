@@ -32,7 +32,8 @@
         {
           "calendarPermission": "LifeOS needs access to your calendar to schedule and manage events."
         }
-      ]
+      ],
+      "expo-speech-recognition"
     ]
   }
 }
