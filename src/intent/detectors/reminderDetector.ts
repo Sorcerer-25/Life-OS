@@ -30,13 +30,13 @@ export function detectReminderIntent(
   const lower = text.toLowerCase();
 
   const hasReminderWord =
-    /\b(remind|reminder|alert me|notify me|don't forget|make sure\s+(?:that\s+)?i|ensure\s+i)\b/.test(
+    /\b(remind|reminder|remainder|alert me|notify me|don't forget|don't let me forget|make sure\s+(?:that\s+)?i|ensure\s+i|ping me|nudge me|can you remind me)\b/i.test(
       lower
     );
   if (!hasReminderWord) return null;
 
   const dateInfo = extractDate(text, baseDate);
-  const timeInfo = extractTime(text);
+  const timeInfo = extractTime(text, baseDate);
   const amountInfo = extractAmount(text);
   const billType = extractBillType(text);
 
@@ -86,7 +86,7 @@ export function detectReminderIntent(
   // General Reminder (set_reminder)
   let title = text
     .replace(
-      /^(please\s+)?(remind\s+me\s+to|remind\s+me\s+about|remind\s+me|reminder\s+to|set\s+a\s+reminder\s+for|set\s+reminder\s+to)\s+/i,
+      /^(please\s+)?(can\s+you\s+remind\s+me\s+to|can\s+you\s+remind\s+me|remind\s+me\s+to|remind\s+me\s+about|remind\s+me|add\s+(?:a\s+)?(?:reminder|remainder)\s+(?:named\s+|called\s+|to\s+|for\s+)?|create\s+(?:a\s+)?(?:reminder|remainder)\s+(?:named\s+|called\s+|to\s+|for\s+)?|reminder\s+to|set\s+a\s+reminder\s+for|set\s+reminder\s+to|set\s+(?:a\s+)?(?:reminder|remainder)\s+(?:named\s+|called\s+|to\s+|for\s+)?|(?:reminder|remainder)\s+(?:named\s+|called\s+)?|don'?t\s+let\s+me\s+forget\s+to|don'?t\s+forget\s+to|alert\s+me\s+to|ping\s+me\s+to|nudge\s+me\s+to|make\s+sure\s+(?:that\s+)?i\s+|ensure\s+i\s+)\s*/i,
       ''
     )
     .trim();
@@ -95,10 +95,23 @@ export function detectReminderIntent(
     title = title.replace(new RegExp(`\\b${escapeRegExp(dateInfo.matchedText)}\\b`, 'gi'), '').trim();
   }
   if (timeInfo) {
-    title = title.replace(new RegExp(`\\b(?:at\\s+|by\\s+)?${escapeRegExp(timeInfo.matchedText)}\\b`, 'gi'), '').trim();
+    title = title.replace(new RegExp(`\\b(?:for|at|by)?\\s*${escapeRegExp(timeInfo.matchedText)}\\b`, 'gi'), '').trim();
   }
 
-  title = title.replace(/^about\s+/i, '').replace(/[\.,]$/, '').trim();
+  const recurrenceMatch = text.match(
+    /\b(every\s+(?:morning|evening|afternoon|day|week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|daily|weekly|monthly)\b/i
+  );
+  if (recurrenceMatch) {
+    title = title.replace(new RegExp(`\\b${escapeRegExp(recurrenceMatch[0])}\\b`, 'gi'), '').trim();
+  }
+
+  title = title
+    .replace(/^named\s+/i, '')
+    .replace(/^called\s+/i, '')
+    .replace(/^about\s+/i, '')
+    .replace(/^for\s+/i, '')
+    .replace(/[\.,]$/, '')
+    .trim();
 
   const entities: Record<string, unknown> = {
     title: title || 'Reminder',
@@ -107,11 +120,23 @@ export function detectReminderIntent(
   if (dateInfo) {
     entities.due_date = dateInfo.dateStr;
     entities.due_date_text = dateInfo.matchedText;
+  } else if (/\bin\s+\w+\s+(hour|minute)/i.test(lower)) {
+    const todayStr = baseDate.toISOString().slice(0, 10);
+    entities.due_date = todayStr;
+    entities.due_date_text = 'today';
+  } else if (recurrenceMatch) {
+    const todayStr = baseDate.toISOString().slice(0, 10);
+    entities.due_date = todayStr;
+    entities.due_date_text = recurrenceMatch[0];
   }
 
   if (timeInfo) {
     entities.start_time = timeInfo.timeStr;
     entities.time_text = timeInfo.matchedText;
+  }
+
+  if (recurrenceMatch) {
+    entities.recurrence = recurrenceMatch[0].toLowerCase();
   }
 
   // Extract recipient if mentioned ("remind me to call Rahul")

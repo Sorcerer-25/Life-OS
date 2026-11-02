@@ -2,15 +2,18 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IdentificationResult } from '../../intent/identifier';
 import { ActionPlan } from '../../models/ActionPlan';
+import { AgentResult } from '../../models/AgentResult';
 
 interface ResultsSectionProps {
   analysisResult: IdentificationResult;
   actionPlan?: ActionPlan;
+  executionResults?: AgentResult[];
 }
 
 export const ResultsSection: React.FC<ResultsSectionProps> = ({
   analysisResult,
   actionPlan,
+  executionResults,
 }) => {
   const [showAnalysisJson, setShowAnalysisJson] = useState<boolean>(false);
   const [showPlanJson, setShowPlanJson] = useState<boolean>(false);
@@ -382,6 +385,76 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                 </ScrollView>
               </View>
             )}
+          </View>
+        </View>
+      )}
+
+      {/* ───────────────────────────────────────────────────────── */}
+      {/* STAGE 3: AGENT EXECUTION & NOTIFICATION DISPATCH          */}
+      {/* ───────────────────────────────────────────────────────── */}
+      {executionResults && executionResults.length > 0 && (
+        <View style={styles.stageTwoContainer}>
+          <View style={styles.stageHeader}>
+            <Text style={styles.stageTitle}>Stage 3: Agent Execution & Dispatch</Text>
+            <View style={[styles.statusBadge, styles.statusReady]}>
+              <Text style={styles.statusBadgeText}>DISPATCHED</Text>
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>
+              Execution Results ({executionResults.length})
+            </Text>
+
+            {executionResults.map((res, idx) => (
+              <View key={idx} style={styles.actionBox}>
+                <View style={styles.actionHeader}>
+                  <Text style={styles.actionId}>{res.actionId}</Text>
+                  <View
+                    style={[
+                      styles.actionStatusBadge,
+                      res.status === 'success'
+                        ? styles.statusBadgeReady
+                        : res.status === 'duplicate'
+                        ? styles.statusBadgeDuplicate
+                        : res.status === 'needs_clarification'
+                        ? styles.statusBadgeClarify
+                        : styles.statusBadgeBlocked,
+                    ]}
+                  >
+                    <Text style={styles.actionStatusText}>
+                      {res.status === 'duplicate' ? '⚡ DUPLICATE' : res.status.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.row}>
+                  <Text style={styles.actionFieldLabel}>Agent:</Text>
+                  <Text style={styles.actionAgent}>{res.agentName}</Text>
+                </View>
+
+                <View style={styles.row}>
+                  <Text style={styles.actionFieldLabel}>Message:</Text>
+                  <Text style={styles.fieldValue}>{res.message}</Text>
+                </View>
+
+                {res.output?.notificationId ? (
+                  <View style={styles.row}>
+                    <Text style={styles.actionFieldLabel}>Notification ID:</Text>
+                    <Text style={[styles.fieldValue, styles.codeText]}>
+                      {String(res.output.notificationId)}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {res.error ? (
+                  <View style={styles.row}>
+                    <Text style={styles.actionFieldLabel}>Error Code:</Text>
+                    <Text style={[styles.fieldValue, { color: '#f87171' }]}>{res.error}</Text>
+                  </View>
+                ) : null}
+              </View>
+            ))}
           </View>
         </View>
       )}
@@ -783,6 +856,9 @@ const styles = StyleSheet.create({
   },
   statusBadgeReady: {
     backgroundColor: '#065f46',
+  },
+  statusBadgeDuplicate: {
+    backgroundColor: '#b45309',
   },
   statusBadgeBlocked: {
     backgroundColor: '#7f1d1d',

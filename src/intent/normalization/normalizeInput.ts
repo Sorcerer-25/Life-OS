@@ -84,10 +84,15 @@ export function normalizeAndSegmentInput(rawText: string): NormalizedInputResult
   const conjunctionDelimiters = [
     /\s+(?:then|and\s+then)\s+(?=(?:need|have|remind|add|create|submit|call|send|schedule|plan|spent|paid|i\s+spent|i\s+paid)\b)/i,
     /\s+then\s+/i,
-    /\s+and\s+(?=(?:need|have|remind|add|create|submit|call|send|schedule|plan|spent|paid|i\s+spent|i\s+paid)\b)/i,
+    /\s*,\s*but\s+/i,
+    /\s+but\s+(?=(?:another|i\s+still|still|need|have)\b)/i,
+    /\s+and\s+(?:i\s+)?also\s+(?=(?:remind|add|schedule|need|pay|spent|paid)\b)/i,
+    /\s+and\s+(?=(?:need|have|remind|add|create|submit|call|send|schedule|plan|spent|paid|i\s+spent|i\s+paid|i\s+also)\b)/i,
+    /\s*,\s*(?=(?:add\s+|remind\s+|schedule\s+|create\s+|need\s+to|have\s+to|i\s+paid|i\s+spent|spent|paid)\b)/i,
     /;\s*/,
     /\.\s+(?=[A-Z])/,
     /\s+also\s+(?=(?:remind|add|schedule|need|pay|spent|paid)\b)/i,
+    /(?<=[a-zA-Z0-9₹])\s+(?=(?:remind\s+me|schedule\s+a\s+meeting|create\s+a\s+task|add\s+a\s+task)\b)/i,
   ];
 
   let rawSegments = [text];

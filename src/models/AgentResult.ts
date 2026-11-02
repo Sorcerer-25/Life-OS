@@ -1,6 +1,6 @@
 import { AgentName } from './ActionPlan';
 
-export type AgentStatus = 'success' | 'failure' | 'needs_clarification';
+export type AgentStatus = 'success' | 'failure' | 'needs_clarification' | 'duplicate';
 
 export interface AgentResult {
   taskId: string;

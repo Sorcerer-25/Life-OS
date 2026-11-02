@@ -99,26 +99,29 @@ export function resolveRelativeDate(
  * Extracts time of day like "3 PM", "3:30 pm", "15:00", etc.
  */
 export function extractTime(text: string): { timeStr: string; matchedText: string } | null {
-  // Matches "3 PM", "3:30 PM", "11:45 am"
-  const ampmMatch = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  // Matches "3 PM", "3:30 PM", "12.54 pm", "11:45 am"
+  const ampmMatch = text.match(/\b(?:at|by|for)?\s*(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b/i);
   if (ampmMatch) {
     let hours = parseInt(ampmMatch[1], 10);
     const minutes = ampmMatch[2] ? parseInt(ampmMatch[2], 10) : 0;
     const meridian = ampmMatch[3].toLowerCase();
 
-    if (meridian === 'pm' && hours < 12) {
-      hours += 12;
-    } else if (meridian === 'am' && hours === 12) {
-      hours = 0;
-    }
+    if (hours >= 1 && hours <= 12 && minutes >= 0 && minutes <= 59) {
+      if (meridian === 'pm' && hours < 12) {
+        hours += 12;
+      } else if (meridian === 'am' && hours === 12) {
+        hours = 0;
+      }
 
-    const hh = String(hours).padStart(2, '0');
-    const mm = String(minutes).padStart(2, '0');
-    return { timeStr: `${hh}:${mm}:00`, matchedText: ampmMatch[0] };
+      const hh = String(hours).padStart(2, '0');
+      const mm = String(minutes).padStart(2, '0');
+      const cleanText = ampmMatch[0].replace(/^(?:at|by|for)\s+/i, '').trim();
+      return { timeStr: `${hh}:${mm}:00`, matchedText: cleanText };
+    }
   }
 
-  // Matches 24-hour "15:00"
-  const h24Match = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?\b/);
+  // Matches 24-hour "15:00", "15.00"
+  const h24Match = text.match(/\b([01]?\d|2[0-3])[:.]([0-5]\d)(?:[:.]([0-5]\d))?\b/);
   if (h24Match) {
     const hh = String(parseInt(h24Match[1], 10)).padStart(2, '0');
     const mm = h24Match[2];

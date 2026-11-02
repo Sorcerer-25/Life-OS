@@ -11,22 +11,23 @@ export function detectTaskIntent(
   const lower = text.toLowerCase();
 
   const isTaskMatch =
-    /\b(add\s+(?:a\s+)?task|create\s+(?:a\s+)?task|new\s+task|todo|to-do|task:)\b/.test(lower) ||
-    /\b(need\s+to\s+send|send\s+.*?\s+the\s+project\s+report|submit\s+my\s+assignment|clean\s+my\s+room|buy\s+groceries|finish\s+homework|wash\s+clothes)\b/.test(
+    /\b(add\s+(?:a\s+)?task|create\s+(?:a\s+)?task|make\s+(?:a\s+)?task|new\s+task|todo|to-do|task:|add\s+.*?to\s+(?:my\s+)?task\s+list)\b/.test(lower) ||
+    /\b(need\s+to\s+send|send\s+.*?\s+the\s+project\s+report|submit\s+my\s+assignment|clean\s+my\s+room|buy\s+groceries|finish\s+homework|wash\s+clothes|prepare\s+for\s+.*?\s+exam)\b/.test(
       lower
     ) ||
-    /^(?:need\s+to|have\s+to)\s+(?:send|submit|finish|complete|write|prepare|clean)\b/i.test(text);
+    /^(?:need\s+to|have\s+to)\s+(?:send|submit|finish|complete|write|prepare|clean|book)\b/i.test(text);
 
   if (!isTaskMatch) return null;
 
   const dateInfo = extractDate(text, baseDate);
-  const timeInfo = extractTime(text);
+  const timeInfo = extractTime(text, baseDate);
 
   let taskTitle = text
     .replace(
-      /^(please\s+)?(add\s+(?:a\s+)?task\s+to|add\s+(?:a\s+)?task|create\s+(?:a\s+)?task\s+to|create\s+(?:a\s+)?task|todo:?|to-do:?|task:?|need\s+to\s+|have\s+to\s+)\s+/i,
+      /^(please\s+)?(add\s+(?:a\s+)?task\s+to|add\s+(?:a\s+)?task|create\s+(?:a\s+)?task\s+to|create\s+(?:a\s+)?task|make\s+(?:a\s+)?task\s+for|make\s+(?:a\s+)?task\s+to|todo:?|to-do:?|task:?|need\s+to\s+|have\s+to\s+)\s+/i,
       ''
     )
+    .replace(/\s+to\s+(?:my\s+)?task\s+list$/i, '')
     .trim();
 
   if (dateInfo) {

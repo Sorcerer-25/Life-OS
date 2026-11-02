@@ -1,4 +1,4 @@
-import { AgentName } from './ActionPlan';
+import { ActionPayload, AgentName } from './ActionPlan';
 
 export interface AgentTask {
   taskId: string;
@@ -6,7 +6,7 @@ export interface AgentTask {
   actionId: string;
   agentName: AgentName;
   operation: string;
-  data: Record<string, unknown>;
+  data: ActionPayload | Record<string, unknown>;
   context?: Record<string, unknown>;
 }
 

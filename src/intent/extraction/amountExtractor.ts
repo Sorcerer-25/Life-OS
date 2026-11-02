@@ -37,13 +37,31 @@ export function extractAmount(text: string): ExtractedAmount | null {
     return { amount: num, currency, rawMatchedText: suffixMatch[0] };
   }
 
-  // 3. Numbers without currency symbol (e.g. "paid 200", "spent 250", "for 1200", "of 500")
+  // 3. Numbers without currency symbol (e.g. "paid 200", "spent 250", "for 1200", "of 500", "cost me 350")
   const contextMatch = text.match(
-    /\b(?:spent|paid|for|of|costing|around|worth|amount\s+of)\s+([\d,]+(?:\.\d+)?)\b/i
+    /\b(?:spent|paid|for|of|costing|cost\s+me|cost|around|worth|amount\s+of|add|record)\s+([\d,]+(?:\.\d+)?)\b/i
   );
   if (contextMatch) {
     const num = parseFloat(contextMatch[1].replace(/,/g, ''));
     return { amount: num, currency: undefined, rawMatchedText: contextMatch[0] };
+  }
+
+  // 4. Shorthand amounts: "2k" → 2000, "5k" → 5000
+  const shorthandMatch = text.match(
+    /\b(?:spent|paid|for|of|costing|cost\s+me|cost|around|worth|amount\s+of|add|record)?\s*([\d,]+(?:\.\d+)?)\s*k\b/i
+  );
+  if (shorthandMatch) {
+    const num = parseFloat(shorthandMatch[1].replace(/,/g, '')) * 1000;
+    return { amount: num, currency: undefined, rawMatchedText: shorthandMatch[0] };
+  }
+
+  // 5. Standalone number as last resort when preceded by ₹-like context (bare number after "add")
+  const bareNumberMatch = text.match(
+    /\b([\d,]+(?:\.\d+)?)\s+(?:as\s+(?:my\s+)?(?:\w+\s+)?expense)\b/i
+  );
+  if (bareNumberMatch) {
+    const num = parseFloat(bareNumberMatch[1].replace(/,/g, ''));
+    return { amount: num, currency: undefined, rawMatchedText: bareNumberMatch[0] };
   }
 
   return null;

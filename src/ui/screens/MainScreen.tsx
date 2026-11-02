@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -8,14 +8,19 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { defaultAgentDispatcher } from '../../agents/agentRegistry';
+import { defaultReminderAgent } from '../../agents/reminderAgent';
+import { defaultReminderRepository, ReminderRecord } from '../../database/reminderRepository';
 import { createTextInputEvent } from '../../input/inputCapture';
 import { IdentificationResult } from '../../intent/identifier';
 import { defaultIntentService } from '../../intent/intentService';
 import { ActionPlan } from '../../models/ActionPlan';
+import { AgentResult } from '../../models/AgentResult';
 import { SupervisorAgent } from '../../supervisor/supervisor';
 import { Header } from '../components/Header';
 import { ResultsSection } from '../components/ResultsSection';
 import { SampleChips } from '../components/SampleChips';
+import { ScheduledRemindersList } from '../components/ScheduledRemindersList';
 import { TextInputSection } from '../components/TextInputSection';
 
 const supervisor = new SupervisorAgent(0.6);
@@ -26,6 +31,21 @@ export const MainScreen: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<IdentificationResult | null>(null);
   const [actionPlan, setActionPlan] = useState<ActionPlan | null>(null);
+  const [executionResults, setExecutionResults] = useState<AgentResult[] | null>(null);
+  const [scheduledReminders, setScheduledReminders] = useState<ReminderRecord[]>([]);
+
+  useEffect(() => {
+    loadReminders();
+  }, []);
+
+  const loadReminders = async () => {
+    try {
+      const list = await defaultReminderRepository.getAllScheduled();
+      setScheduledReminders(list);
+    } catch (err) {
+      console.warn('[MainScreen] Failed to load reminders from SQLite:', err);
+    }
+  };
 
   const handleSelectSample = (sample: string) => {
     setInputText(sample);
@@ -37,6 +57,16 @@ export const MainScreen: React.FC = () => {
     setErrorMessage(null);
     setAnalysisResult(null);
     setActionPlan(null);
+    setExecutionResults(null);
+  };
+
+  const handleCancelReminder = async (reminderId: string) => {
+    try {
+      await defaultReminderAgent.cancel(reminderId);
+      await loadReminders();
+    } catch (err: unknown) {
+      setErrorMessage(`Failed to cancel reminder: ${(err as Error).message}`);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -60,6 +90,13 @@ export const MainScreen: React.FC = () => {
       // 3. Stage 2: Supervisor Orchestration & ActionPlan Generation
       const plan = supervisor.plan(idResult.analysis);
       setActionPlan(plan);
+
+      // 4. Stage 3: Agent Dispatch & Local Notification Scheduling
+      const results = await defaultAgentDispatcher.dispatch(plan);
+      setExecutionResults(results);
+
+      // 5. Refresh SQLite scheduled reminders list
+      await loadReminders();
     } catch (err: unknown) {
       const msg = (err as Error).message || 'Failed to process request';
       setErrorMessage(msg);
@@ -98,11 +135,18 @@ export const MainScreen: React.FC = () => {
             errorMessage={errorMessage}
           />
 
-          {/* Results: Stage 1 (Intent Understanding) + Stage 2 (Supervisor & ActionPlan) */}
+          {/* Active Scheduled Reminders (Persistent from SQLite) */}
+          <ScheduledRemindersList
+            reminders={scheduledReminders}
+            onCancelReminder={handleCancelReminder}
+          />
+
+          {/* Results: Stage 1 (Intent) + Stage 2 (Supervisor) + Stage 3 (Execution) */}
           {analysisResult && (
             <ResultsSection
               analysisResult={analysisResult}
               actionPlan={actionPlan || undefined}
+              executionResults={executionResults || undefined}
             />
           )}
         </ScrollView>
