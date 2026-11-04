@@ -79,6 +79,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.7}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       testID={testID}
