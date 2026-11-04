@@ -16,9 +16,8 @@ import { AgentResult } from '../../models/AgentResult';
 import { NotificationInboxItem } from '../../models/NotificationEvent';
 import { NotificationProcessor } from '../../notifications/notificationProcessor';
 import { useTheme } from '../theme';
-import { ActionPlanCard } from '../components/cards/ActionPlanCard';
 import { ActivityCard } from '../components/cards/ActivityCard';
-import { IntentCard } from '../components/cards/IntentCard';
+import { UnderstandingAndPlanView } from '../components/plan/UnderstandingAndPlanView';
 import { NotificationCard } from '../components/cards/NotificationCard';
 import { AppHeader } from '../components/core/AppHeader';
 import { EmptyState } from '../components/core/EmptyState';
@@ -109,11 +108,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [pendingNotifications, setPendingNotifications] = useState<NotificationInboxItem[]>([]);
   // Recent activity items from SQLite inbox
   const [recentActivities, setRecentActivities] = useState<NotificationInboxItem[]>([]);
-  // Calendar execution states
-  const [calendarResults, setCalendarResults] = useState<Record<string, AgentResult>>({});
-  const [executingActions, setExecutingActions] = useState<Record<string, boolean>>({});
-  // Technical details toggle (collapsed by default for clean presentation)
-  const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
 
   // Dynamic greeting based on current hour
   const getGreeting = () => {
@@ -154,36 +148,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   useEffect(() => {
     loadRealDashboardData();
   }, [unreadNotificationCount, analysisResult]);
-
-  const handleExecuteCalendarAction = async (action: any) => {
-    setExecutingActions((prev) => ({ ...prev, [action.action_id]: true }));
-    try {
-      const result = await calendarAgent.execute({
-        taskId: `task_${Date.now()}`,
-        requestId: actionPlan?.request_id || analysisResult?.analysis.request_id || 'req_home',
-        actionId: action.action_id,
-        agentName: 'calendar_agent',
-        operation: action.operation,
-        data: action.data as unknown as Record<string, unknown>,
-      });
-      setCalendarResults((prev) => ({ ...prev, [action.action_id]: result }));
-      loadRealDashboardData();
-    } catch (err: any) {
-      setCalendarResults((prev) => ({
-        ...prev,
-        [action.action_id]: {
-          taskId: `err_${Date.now()}`,
-          actionId: action.action_id,
-          agentName: 'calendar_agent',
-          status: 'failure',
-          message: err?.message || 'Execution error',
-          error: err?.message,
-        },
-      }));
-    } finally {
-      setExecutingActions((prev) => ({ ...prev, [action.action_id]: false }));
-    }
-  };
 
   const handleSelectShortcut = (shortcut: (typeof QUICK_SHORTCUTS)[0]) => {
     if (shortcut.prompt === '__VOICE__') {
@@ -404,155 +368,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* 4. Results Section (If an input has been analyzed) */}
       {analysisResult && (
-        <View style={{ marginTop: theme.spacing.md }}>
-          <SectionHeader
-            title="LifeOS Analysis & Plan"
-            badge={analysisResult.analysis.intents.length}
-            actionLabel={showTechnicalDetails ? 'Hide JSON ▲' : 'Show Details ▼'}
-            onAction={() => setShowTechnicalDetails(!showTechnicalDetails)}
-          />
-
-          {/* Workflow Status Banner */}
-          {actionPlan && (
-            <View
-              style={[
-                styles.workflowCard,
-                {
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.border,
-                  borderRadius: theme.radii.md,
-                  padding: theme.spacing.md,
-                  marginBottom: theme.spacing.sm,
-                },
-              ]}
-            >
-              <View style={styles.workflowRow}>
-                <View>
-                  <Text style={[theme.typography.caption, { color: theme.colors.textTertiary }]}>
-                    SUPERVISOR DECISION
-                  </Text>
-                  <Text style={[theme.typography.titleMedium, { color: theme.colors.textPrimary, marginTop: 2 }]}>
-                    Workflow Status
-                  </Text>
-                </View>
-                <StatusBadge status={actionPlan.decision.workflow_status} size="md" />
-              </View>
-
-              {/* Reasons */}
-              <View style={{ marginTop: theme.spacing.xs }}>
-                {actionPlan.decision.reasons.map((reason, idx) => (
-                  <Text
-                    key={idx}
-                    style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}
-                  >
-                    • {reason}
-                  </Text>
-                ))}
-              </View>
-
-              {/* Clarification Prompts */}
-              {actionPlan.decision.clarification_questions.length > 0 && (
-                <View
-                  style={[
-                    styles.clarifyBanner,
-                    {
-                      backgroundColor: theme.colors.warningSurface,
-                      borderColor: theme.colors.warningBorder,
-                      borderRadius: theme.radii.xs,
-                      marginTop: theme.spacing.sm,
-                    },
-                  ]}
-                >
-                  <Text style={[theme.typography.caption, { color: theme.colors.warningForeground, fontWeight: '700' }]}>
-                    ❓ Clarification Required:
-                  </Text>
-                  {actionPlan.decision.clarification_questions.map((q, idx) => (
-                    <Text
-                      key={idx}
-                      style={[theme.typography.bodySmall, { color: theme.colors.textPrimary, marginTop: 2 }]}
-                    >
-                      👉 {q}
-                    </Text>
-                  ))}
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* A. What LifeOS Understood */}
-          <View style={{ marginTop: theme.spacing.xs }}>
-            <Text style={[theme.typography.label, { color: theme.colors.textTertiary, marginBottom: 4 }]}>
-              1. What LifeOS Understood
-            </Text>
-            {analysisResult.analysis.intents.map((item) => (
-              <IntentCard key={item.sequence} item={item} />
-            ))}
-          </View>
-
-          {/* B. Proposed Actions Graph */}
-          {actionPlan && (
-            <View style={{ marginTop: theme.spacing.sm }}>
-              <Text style={[theme.typography.label, { color: theme.colors.textTertiary, marginBottom: 4 }]}>
-                2. Proposed Action Graph ({actionPlan.actions.length})
-              </Text>
-              {actionPlan.actions.length === 0 ? (
-                <EmptyState
-                  title="No Actions Needed"
-                  description="LifeOS verified this request does not require background action dispatch."
-                />
-              ) : (
-                actionPlan.actions.map((act) => (
-                  <ActionPlanCard
-                    key={act.action_id}
-                    action={act}
-                    executionResult={calendarResults[act.action_id]}
-                    isExecuting={Boolean(executingActions[act.action_id])}
-                    onExecute={handleExecuteCalendarAction}
-                  />
-                ))
-              )}
-            </View>
-          )}
-
-          {/* Technical JSON details (Controlled by demo toggle) */}
-          {showTechnicalDetails && (
-            <View
-              style={[
-                styles.techBox,
-                {
-                  backgroundColor: theme.colors.surfaceSubtle,
-                  borderColor: theme.colors.border,
-                  borderRadius: theme.radii.md,
-                  padding: theme.spacing.md,
-                  marginTop: theme.spacing.md,
-                },
-              ]}
-            >
-              <Text style={[theme.typography.label, { color: theme.colors.textSecondary, marginBottom: 6 }]}>
-                Technical Audit JSON (IntentAnalysis)
-              </Text>
-              <Text style={[theme.typography.code, { color: theme.colors.textTertiary }]}>
-                {JSON.stringify(analysisResult.analysis, null, 2)}
-              </Text>
-
-              {actionPlan && (
-                <>
-                  <Text
-                    style={[
-                      theme.typography.label,
-                      { color: theme.colors.textSecondary, marginTop: 12, marginBottom: 6 },
-                    ]}
-                  >
-                    Technical Audit JSON (ActionPlan)
-                  </Text>
-                  <Text style={[theme.typography.code, { color: theme.colors.textTertiary }]}>
-                    {JSON.stringify(actionPlan, null, 2)}
-                  </Text>
-                </>
-              )}
-            </View>
-          )}
-        </View>
+        <UnderstandingAndPlanView
+          analysisResult={analysisResult}
+          actionPlan={actionPlan}
+          calendarAgent={calendarAgent}
+        />
       )}
 
       {/* 5. Pending Notification Approvals Section */}

@@ -26,6 +26,7 @@ import { SimulatedNotificationModal } from '../components/SimulatedNotificationM
 import { VoiceInputModal } from '../components/VoiceInputModal';
 import { BottomNavBar, TabKey } from '../components/core/BottomNavBar';
 import { HomeScreen } from './HomeScreen';
+import { InboxScreen } from './InboxScreen';
 import { InputScreen } from './InputScreen';
 
 const supervisor = new SupervisorAgent(0.6);
@@ -205,12 +206,18 @@ export const MainScreen: React.FC = () => {
           onClear={handleClear}
           onOpenVoiceModal={() => setShowVoiceModal(true)}
           onOpenInbox={() => {
-            setShowNotificationInbox(true);
+            setActiveTab('inbox');
             refreshNotificationCount();
           }}
           analysisResult={analysisResult}
           actionPlan={actionPlan}
           calendarAgent={calendarAgent}
+        />
+      ) : activeTab === 'inbox' ? (
+        <InboxScreen
+          processor={notificationProcessor}
+          onOpenSimulate={() => setShowSimulateNotification(true)}
+          onOpenSettings={() => setShowNotificationSettings(true)}
         />
       ) : null}
 
@@ -218,14 +225,10 @@ export const MainScreen: React.FC = () => {
       <BottomNavBar
         activeTab={activeTab}
         onSelectTab={(tab) => {
-          if (tab === 'inbox') {
-            setShowNotificationInbox(true);
-            refreshNotificationCount();
-          } else if (tab === 'settings') {
+          if (tab === 'settings') {
             setShowNotificationSettings(true);
           } else if (tab === 'activity') {
-            setShowNotificationInbox(true);
-            refreshNotificationCount();
+            setActiveTab('inbox');
           } else {
             setActiveTab(tab);
           }
