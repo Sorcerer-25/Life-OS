@@ -69,3 +69,4 @@ export const typography: TypographyScale = {
     lineHeight: 16,
   },
 };
+

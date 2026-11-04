@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   AppState,
   AppStateStatus,
+  View,
 } from 'react-native';
 import { CalendarAgent } from '../../calendar/calendarAgent';
 import { createTextInputEvent, createVoiceInputEvent } from '../../input/inputCapture';
@@ -23,13 +24,16 @@ import { NotificationInboxModal } from '../components/NotificationInboxModal';
 import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
 import { SimulatedNotificationModal } from '../components/SimulatedNotificationModal';
 import { VoiceInputModal } from '../components/VoiceInputModal';
+import { BottomNavBar, TabKey } from '../components/core/BottomNavBar';
 import { HomeScreen } from './HomeScreen';
+import { InputScreen } from './InputScreen';
 
 const supervisor = new SupervisorAgent(0.6);
 const calendarAgent = new CalendarAgent();
 const notificationProcessor = new NotificationProcessor(undefined, undefined, calendarAgent);
 
 export const MainScreen: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [inputText, setInputText] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -164,30 +168,69 @@ export const MainScreen: React.FC = () => {
   };
 
   return (
-    <>
-      <HomeScreen
-        inputText={inputText}
-        setInputText={setInputText}
-        isLoading={isLoading}
-        errorMessage={errorMessage}
-        setErrorMessage={setErrorMessage}
-        onAnalyze={handleAnalyze}
-        onClear={handleClear}
-        onOpenVoiceModal={() => setShowVoiceModal(true)}
-        onOpenInbox={() => {
-          setShowNotificationInbox(true);
-          refreshNotificationCount();
+    <View style={{ flex: 1 }}>
+      {activeTab === 'home' ? (
+        <HomeScreen
+          inputText={inputText}
+          setInputText={setInputText}
+          isLoading={isLoading}
+          errorMessage={errorMessage}
+          setErrorMessage={setErrorMessage}
+          onAnalyze={handleAnalyze}
+          onClear={handleClear}
+          onOpenVoiceModal={() => setShowVoiceModal(true)}
+          onOpenInbox={() => {
+            setShowNotificationInbox(true);
+            refreshNotificationCount();
+          }}
+          onOpenSimulateNotification={() => setShowSimulateNotification(true)}
+          onOpenNotificationSettings={() => setShowNotificationSettings(true)}
+          onOpenCalendarSettings={() => setShowCalendarSettings(true)}
+          onOpenCreatedEvents={() => setShowCreatedEvents(true)}
+          unreadNotificationCount={unreadNotificationCount}
+          analysisResult={analysisResult}
+          actionPlan={actionPlan}
+          calendarAgent={calendarAgent}
+          notificationProcessor={notificationProcessor}
+          refreshNotificationCount={refreshNotificationCount}
+        />
+      ) : activeTab === 'input' ? (
+        <InputScreen
+          inputText={inputText}
+          setInputText={setInputText}
+          isLoading={isLoading}
+          errorMessage={errorMessage}
+          setErrorMessage={setErrorMessage}
+          onAnalyze={handleAnalyze}
+          onClear={handleClear}
+          onOpenVoiceModal={() => setShowVoiceModal(true)}
+          onOpenInbox={() => {
+            setShowNotificationInbox(true);
+            refreshNotificationCount();
+          }}
+          analysisResult={analysisResult}
+          actionPlan={actionPlan}
+          calendarAgent={calendarAgent}
+        />
+      ) : null}
+
+      {/* Persistent Bottom Navigation Bar */}
+      <BottomNavBar
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          if (tab === 'inbox') {
+            setShowNotificationInbox(true);
+            refreshNotificationCount();
+          } else if (tab === 'settings') {
+            setShowNotificationSettings(true);
+          } else if (tab === 'activity') {
+            setShowNotificationInbox(true);
+            refreshNotificationCount();
+          } else {
+            setActiveTab(tab);
+          }
         }}
-        onOpenSimulateNotification={() => setShowSimulateNotification(true)}
-        onOpenNotificationSettings={() => setShowNotificationSettings(true)}
-        onOpenCalendarSettings={() => setShowCalendarSettings(true)}
-        onOpenCreatedEvents={() => setShowCreatedEvents(true)}
-        unreadNotificationCount={unreadNotificationCount}
-        analysisResult={analysisResult}
-        actionPlan={actionPlan}
-        calendarAgent={calendarAgent}
-        notificationProcessor={notificationProcessor}
-        refreshNotificationCount={refreshNotificationCount}
+        unreadInboxCount={unreadNotificationCount}
       />
 
       {/* Voice Recognition Modal */}
@@ -239,6 +282,6 @@ export const MainScreen: React.FC = () => {
         onClose={() => setShowCreatedEvents(false)}
         calendarAgent={calendarAgent}
       />
-    </>
+    </View>
   );
 };

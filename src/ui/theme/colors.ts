@@ -182,3 +182,4 @@ export const lightColors: ThemeColors = {
   overlay: 'rgba(15, 23, 42, 0.55)',
   shadow: '#0F172A',
 };
+

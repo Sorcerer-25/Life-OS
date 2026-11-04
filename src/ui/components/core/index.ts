@@ -10,3 +10,5 @@ export * from './LoadingState';
 export * from './ErrorState';
 export * from './ConfirmationDialog';
 export * from './BottomSheet';
+export * from './BottomNavBar';
+

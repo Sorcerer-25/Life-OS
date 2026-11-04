@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   StyleSheet,
   Text,
@@ -14,6 +15,10 @@ import {
   VoiceRecognitionState,
   VoiceService,
 } from '../../voice/voiceService';
+import { useTheme } from '../theme';
+import { IconButton } from './core/IconButton';
+import { PrimaryButton } from './core/PrimaryButton';
+import { SecondaryButton } from './core/SecondaryButton';
 
 interface VoiceInputModalProps {
   visible: boolean;
@@ -33,18 +38,59 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
   voiceService = defaultVoiceService,
   defaultLanguage = 'en-IN',
 }) => {
+  const { theme } = useTheme();
+
   const [language, setLanguage] = useState<VoiceLanguage>(defaultLanguage);
   const [recordingState, setRecordingState] = useState<VoiceRecognitionState>('idle');
   const [transcript, setTranscript] = useState<string>('');
   const [confidence, setConfidence] = useState<number | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPermanentlyDenied, setIsPermanentlyDenied] = useState<boolean>(false);
+  const [isModuleAvailable, setIsModuleAvailable] = useState<boolean>(true);
+
+  // Pulse animation for recording wave
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    let animLoop: Animated.CompositeAnimation | null = null;
+    if (recordingState === 'listening') {
+      animLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.25,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animLoop.start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+
+    return () => {
+      animLoop?.stop();
+    };
+  }, [recordingState]);
 
   useEffect(() => {
     if (visible) {
       resetState();
-      // Start recording automatically when modal opens
-      startListening(language);
+      const available = voiceService.isAvailable();
+      setIsModuleAvailable(available);
+
+      if (available) {
+        startListening(language);
+      } else {
+        setErrorMessage(
+          'On-device speech recognition module is not available in Expo Go. In an Android development build, native speech recognition operates offline.'
+        );
+      }
     } else {
       voiceService.abortListening();
       resetState();
@@ -121,165 +167,284 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+      <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
+        <View
+          style={[
+            styles.modalContent,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              borderTopLeftRadius: theme.radii.xl,
+              borderTopRightRadius: theme.radii.xl,
+            },
+            theme.shadows.lg,
+          ]}
+        >
           {/* Header */}
-          <View style={styles.modalHeader}>
-            <View>
-              <Text style={styles.modalTitle}>🎤 Voice Input</Text>
-              <Text style={styles.modalSubtitle}>
-                On-device speech recognition. You can edit before sending.
+          <View
+            style={[
+              styles.modalHeader,
+              {
+                paddingBottom: theme.spacing.md,
+                borderBottomColor: theme.colors.divider,
+              },
+            ]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[theme.typography.titleLarge, { color: theme.colors.textPrimary }]}>
+                🎤 Voice Request
+              </Text>
+              <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
+                On-device speech recognition. Editable before sending.
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
+            <IconButton icon="✕" onPress={onClose} accessibilityLabel="Close voice modal" size="sm" />
           </View>
 
           {/* Language Selector */}
-          <View style={styles.languageContainer}>
-            <Text style={styles.languageLabel}>Recognition Language:</Text>
+          <View style={[styles.languageContainer, { marginTop: theme.spacing.md }]}>
+            <Text style={[theme.typography.label, { color: theme.colors.textTertiary, marginBottom: 6 }]}>
+              Recognition Language
+            </Text>
             <View style={styles.languageToggles}>
-              <TouchableOpacity
-                style={[
-                  styles.languageChip,
-                  language === 'en-IN' && styles.languageChipActive,
-                ]}
-                onPress={() => handleLanguageChange('en-IN')}
-                disabled={recordingState === 'listening'}
-              >
-                <Text
-                  style={[
-                    styles.languageChipText,
-                    language === 'en-IN' && styles.languageChipTextActive,
-                  ]}
-                >
-                  🇮🇳 English (India)
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.languageChip,
-                  language === 'en-US' && styles.languageChipActive,
-                ]}
-                onPress={() => handleLanguageChange('en-US')}
-                disabled={recordingState === 'listening'}
-              >
-                <Text
-                  style={[
-                    styles.languageChipText,
-                    language === 'en-US' && styles.languageChipTextActive,
-                  ]}
-                >
-                  🇺🇸 English (US)
-                </Text>
-              </TouchableOpacity>
+              {(
+                [
+                  { key: 'en-IN', label: '🇮🇳 English (India)' },
+                  { key: 'en-US', label: '🇺🇸 English (US)' },
+                ] as const
+              ).map((langItem) => {
+                const isActive = language === langItem.key;
+                return (
+                  <TouchableOpacity
+                    key={langItem.key}
+                    style={[
+                      styles.languageChip,
+                      {
+                        backgroundColor: isActive
+                          ? theme.colors.primaryMuted
+                          : theme.colors.surfaceSubtle,
+                        borderColor: isActive ? theme.colors.primaryLight : theme.colors.border,
+                        borderRadius: theme.radii.sm,
+                      },
+                    ]}
+                    onPress={() => handleLanguageChange(langItem.key)}
+                    disabled={recordingState === 'listening'}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        theme.typography.bodySmall,
+                        {
+                          color: isActive ? theme.colors.primaryLight : theme.colors.textSecondary,
+                          fontWeight: isActive ? '700' : '500',
+                        },
+                      ]}
+                    >
+                      {langItem.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
-          {/* Mic Status & Live Indicator */}
+          {/* Pulsing Visual Recording Indicator */}
           <View style={styles.indicatorContainer}>
             {recordingState === 'listening' ? (
-              <View style={styles.listeningRow}>
-                <View style={styles.pulsingMic}>
+              <View style={styles.listeningCenter}>
+                <Animated.View
+                  style={[
+                    styles.pulseCircle,
+                    {
+                      backgroundColor: theme.colors.errorSurface,
+                      borderColor: theme.colors.error,
+                      transform: [{ scale: pulseAnim }],
+                    },
+                  ]}
+                >
                   <Text style={styles.micIconLarge}>🎙️</Text>
-                </View>
-                <Text style={styles.listeningText}>Listening... Speak your request</Text>
+                </Animated.View>
+                <Text
+                  style={[
+                    theme.typography.titleSmall,
+                    { color: theme.colors.primaryLight, marginTop: theme.spacing.md },
+                  ]}
+                >
+                  Listening... Speak your request
+                </Text>
               </View>
             ) : recordingState === 'processing' ? (
-              <View style={styles.listeningRow}>
-                <ActivityIndicator size="small" color="#38bdf8" />
-                <Text style={styles.listeningText}>Finalizing transcript...</Text>
+              <View style={styles.listeningCenter}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text
+                  style={[
+                    theme.typography.bodyMedium,
+                    { color: theme.colors.textSecondary, marginTop: theme.spacing.sm },
+                  ]}
+                >
+                  Finalizing transcript...
+                </Text>
               </View>
             ) : (
-              <View style={styles.listeningRow}>
-                <Text style={styles.idleText}>
-                  {transcript ? 'Tap the transcript to edit below' : 'Tap Re-record to start speaking'}
+              <View style={styles.listeningCenter}>
+                <View
+                  style={[
+                    styles.idleCircle,
+                    {
+                      backgroundColor: theme.colors.surfaceSubtle,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={styles.micIconLarge}>🎙️</Text>
+                </View>
+                <Text
+                  style={[
+                    theme.typography.bodyMedium,
+                    { color: theme.colors.textSecondary, marginTop: theme.spacing.sm },
+                  ]}
+                >
+                  {transcript
+                    ? 'Review and edit transcript below'
+                    : isModuleAvailable
+                    ? 'Tap Start Speaking to record'
+                    : 'Type a request below'}
                 </Text>
               </View>
             )}
           </View>
 
-          {/* Error Message */}
+          {/* Friendly Expo Go / Error Notice Banner */}
           {errorMessage && (
-            <View style={styles.errorBanner}>
-              <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+            <View
+              style={[
+                styles.noticeBanner,
+                {
+                  backgroundColor: !isModuleAvailable
+                    ? theme.colors.infoSurface
+                    : theme.colors.errorSurface,
+                  borderColor: !isModuleAvailable
+                    ? theme.colors.infoBorder
+                    : theme.colors.errorBorder,
+                  borderRadius: theme.radii.sm,
+                  padding: theme.spacing.md,
+                  marginBottom: theme.spacing.sm,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  theme.typography.bodySmall,
+                  {
+                    color: !isModuleAvailable
+                      ? theme.colors.infoForeground
+                      : theme.colors.errorForeground,
+                    lineHeight: 18,
+                  },
+                ]}
+              >
+                {!isModuleAvailable ? 'ℹ️ ' : '⚠️ '}
+                {errorMessage}
+              </Text>
               {isPermanentlyDenied && (
-                <TouchableOpacity
-                  style={styles.settingsButton}
-                  onPress={() => voiceService.openSettingsAsync()}
-                >
-                  <Text style={styles.settingsButtonText}>Open Android Settings</Text>
-                </TouchableOpacity>
+                <View style={{ marginTop: theme.spacing.sm }}>
+                  <SecondaryButton
+                    label="Open Phone Settings"
+                    onPress={() => voiceService.openSettingsAsync()}
+                    size="sm"
+                  />
+                </View>
               )}
             </View>
           )}
 
-          {/* Editable Transcript Area */}
-          <View style={styles.transcriptBox}>
-            <View style={styles.transcriptHeader}>
-              <Text style={styles.transcriptLabel}>Transcript (Editable):</Text>
+          {/* Editable Transcript Box */}
+          <View
+            style={[
+              styles.transcriptBox,
+              {
+                backgroundColor: theme.colors.surfaceSubtle,
+                borderColor: theme.colors.border,
+                borderRadius: theme.radii.md,
+                padding: theme.spacing.md,
+              },
+            ]}
+          >
+            <View style={styles.transcriptHeaderRow}>
+              <Text style={[theme.typography.label, { color: theme.colors.textTertiary }]}>
+                Transcript (Tap to edit)
+              </Text>
               {confidence !== undefined && (
-                <Text style={styles.confidenceBadge}>
+                <Text style={[theme.typography.caption, { color: theme.colors.successForeground, fontWeight: '700' }]}>
                   Confidence: {Math.round(confidence * 100)}%
                 </Text>
               )}
             </View>
+
             <TextInput
-              style={styles.transcriptInput}
+              style={[
+                styles.transcriptInput,
+                {
+                  color: theme.colors.textPrimary,
+                  marginTop: theme.spacing.xs,
+                },
+                theme.typography.bodyLarge,
+              ]}
               multiline
               value={transcript}
               onChangeText={(text) => {
                 setTranscript(text);
-                if (errorMessage) setErrorMessage(null);
+                if (errorMessage && isModuleAvailable) setErrorMessage(null);
               }}
               placeholder={
                 recordingState === 'listening'
                   ? 'Words will appear here as you speak...'
-                  : 'Speak into the mic or edit transcript here...'
+                  : 'Speak into mic or type your request directly here...'
               }
-              placeholderTextColor="#64748b"
+              placeholderTextColor={theme.colors.textMuted}
             />
           </View>
 
-          {/* Notice on device offline limitations */}
-          <Text style={styles.limitationsNote}>
-            ℹ️ Speech-to-text uses Android SpeechRecognizer. Offline accuracy depends on whether
-            your device has offline language packs installed.
+          {/* Limitations note */}
+          <Text
+            style={[
+              theme.typography.caption,
+              { color: theme.colors.textTertiary, marginVertical: theme.spacing.sm, textAlign: 'center' },
+            ]}
+          >
+            ℹ️ Uses Android on-device speech engine. Offline capability depends on offline voice packs.
           </Text>
 
           {/* Action Buttons */}
-          <View style={styles.actionsContainer}>
+          <View style={[styles.actionsRow, { gap: theme.spacing.md, marginTop: theme.spacing.xs }]}>
             {recordingState === 'listening' ? (
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.stopBtn]}
-                onPress={handleStop}
-              >
-                <Text style={styles.stopBtnText}>⏹️ Stop & Review</Text>
-              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <PrimaryButton
+                  label="Stop & Review"
+                  icon="⏹️"
+                  onPress={handleStop}
+                  variant="danger"
+                />
+              </View>
             ) : (
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.recordBtn]}
-                onPress={() => startListening(language)}
-              >
-                <Text style={styles.recordBtnText}>
-                  {transcript ? '🔄 Re-record' : '🎙️ Start Speaking'}
-                </Text>
-              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <SecondaryButton
+                  label={transcript ? 'Re-record' : 'Start Speaking'}
+                  icon="🎙️"
+                  onPress={() => startListening(language)}
+                  disabled={!isModuleAvailable}
+                />
+              </View>
             )}
 
-            <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                styles.sendBtn,
-                (!transcript.trim() || recordingState === 'listening') && styles.disabledBtn,
-              ]}
-              onPress={handleSend}
-              disabled={!transcript.trim() || recordingState === 'listening'}
-            >
-              <Text style={styles.sendBtnText}>⚡ Send to LifeOS</Text>
-            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton
+                label="Send to LifeOS"
+                icon="⚡"
+                onPress={handleSend}
+                disabled={!transcript.trim() || recordingState === 'listening'}
+              />
+            </View>
           </View>
         </View>
       </View>
@@ -290,53 +455,23 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#0f172a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    borderColor: '#1e293b',
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
     padding: 20,
-    maxHeight: '90%',
+    maxHeight: '92%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#f8fafc',
-  },
-  modalSubtitle: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 2,
-  },
-  closeButton: {
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: '#1e293b',
-  },
-  closeButtonText: {
-    color: '#94a3b8',
-    fontSize: 16,
-    fontWeight: 'bold',
+    alignItems: 'center',
+    borderBottomWidth: 1,
   },
   languageContainer: {
-    marginBottom: 14,
-  },
-  languageLabel: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginBottom: 8,
   },
   languageToggles: {
     flexDirection: 'row',
@@ -346,152 +481,54 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#1e293b',
     borderWidth: 1,
-    borderColor: '#334155',
     alignItems: 'center',
   },
-  languageChipActive: {
-    backgroundColor: '#0284c7',
-    borderColor: '#38bdf8',
-  },
-  languageChipText: {
-    fontSize: 12,
-    color: '#94a3b8',
-    fontWeight: '600',
-  },
-  languageChipTextActive: {
-    color: '#ffffff',
-  },
   indicatorContainer: {
-    paddingVertical: 10,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  listeningRow: {
-    flexDirection: 'row',
+  listeningCenter: {
     alignItems: 'center',
-    gap: 10,
   },
-  pulsingMic: {
-    backgroundColor: '#ef4444',
-    padding: 8,
-    borderRadius: 20,
+  pulseCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  idleCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
   micIconLarge: {
-    fontSize: 18,
+    fontSize: 26,
   },
-  listeningText: {
-    fontSize: 14,
-    color: '#38bdf8',
-    fontWeight: '600',
-  },
-  idleText: {
-    fontSize: 13,
-    color: '#94a3b8',
-  },
-  errorBanner: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  noticeBanner: {
     borderWidth: 1,
-    borderColor: '#ef4444',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
-  },
-  errorText: {
-    color: '#fca5a5',
-    fontSize: 13,
-  },
-  settingsButton: {
-    marginTop: 8,
-    backgroundColor: '#ef4444',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  settingsButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
   },
   transcriptBox: {
-    backgroundColor: '#1e293b',
-    borderRadius: 10,
-    padding: 12,
     borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 10,
+    minHeight: 100,
   },
-  transcriptHeader: {
+  transcriptHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  transcriptLabel: {
-    fontSize: 12,
-    color: '#cbd5e1',
-    fontWeight: '600',
-  },
-  confidenceBadge: {
-    fontSize: 11,
-    color: '#38bdf8',
-    fontWeight: '500',
+    alignItems: 'center',
   },
   transcriptInput: {
     minHeight: 80,
     maxHeight: 140,
-    color: '#f8fafc',
-    fontSize: 15,
-    lineHeight: 22,
     textAlignVertical: 'top',
   },
-  limitationsNote: {
-    fontSize: 11,
-    color: '#64748b',
-    marginBottom: 16,
-    lineHeight: 15,
-  },
-  actionsContainer: {
+  actionsRow: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recordBtn: {
-    backgroundColor: '#1e293b',
-    borderWidth: 1,
-    borderColor: '#475569',
-  },
-  recordBtnText: {
-    color: '#f8fafc',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  stopBtn: {
-    backgroundColor: '#ef4444',
-  },
-  stopBtnText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  sendBtn: {
-    backgroundColor: '#38bdf8',
-  },
-  sendBtnText: {
-    color: '#0f172a',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  disabledBtn: {
-    opacity: 0.5,
   },
 });
-

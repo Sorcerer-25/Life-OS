@@ -64,3 +64,4 @@ export async function persistThemeMode(mode: ThemeMode): Promise<void> {
 export function getCurrentThemeMode(): ThemeMode {
   return currentThemeMode;
 }
+
