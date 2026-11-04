@@ -2,13 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   AppState,
   AppStateStatus,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  View,
 } from 'react-native';
 import { CalendarAgent } from '../../calendar/calendarAgent';
 import { createTextInputEvent, createVoiceInputEvent } from '../../input/inputCapture';
@@ -26,14 +19,11 @@ import { SupervisorAgent } from '../../supervisor/supervisor';
 import { VoiceLanguage } from '../../voice/voiceService';
 import { CalendarSettingsModal } from '../components/CalendarSettingsModal';
 import { CreatedEventsModal } from '../components/CreatedEventsModal';
-import { Header } from '../components/Header';
 import { NotificationInboxModal } from '../components/NotificationInboxModal';
 import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
-import { ResultsSection } from '../components/ResultsSection';
-import { SampleChips } from '../components/SampleChips';
 import { SimulatedNotificationModal } from '../components/SimulatedNotificationModal';
-import { TextInputSection } from '../components/TextInputSection';
 import { VoiceInputModal } from '../components/VoiceInputModal';
+import { HomeScreen } from './HomeScreen';
 
 const supervisor = new SupervisorAgent(0.6);
 const calendarAgent = new CalendarAgent();
@@ -174,56 +164,31 @@ export const MainScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Header */}
-          <Header
-            onOpenCalendarSettings={() => setShowCalendarSettings(true)}
-            onOpenCreatedEvents={() => setShowCreatedEvents(true)}
-            onOpenNotificationInbox={() => {
-              setShowNotificationInbox(true);
-              refreshNotificationCount();
-            }}
-            onOpenSimulateNotification={() => setShowSimulateNotification(true)}
-            onOpenNotificationSettings={() => setShowNotificationSettings(true)}
-            unreadNotificationCount={unreadNotificationCount}
-          />
-
-          {/* Test Acceptance Sample Chips */}
-          <SampleChips onSelectSample={handleSelectSample} />
-
-          {/* Natural Language Text & Voice Input Section */}
-          <TextInputSection
-            inputText={inputText}
-            onChangeText={(txt) => {
-              setInputText(txt);
-              if (errorMessage) setErrorMessage(null);
-            }}
-            onAnalyze={handleAnalyze}
-            onOpenVoiceModal={() => setShowVoiceModal(true)}
-            isLoading={isLoading}
-            onClear={handleClear}
-            errorMessage={errorMessage}
-          />
-
-          {/* Results: Stage 1 (Intent Understanding) + Stage 2 (Supervisor & ActionPlan) */}
-          {analysisResult && (
-            <ResultsSection
-              analysisResult={analysisResult}
-              actionPlan={actionPlan || undefined}
-              calendarAgent={calendarAgent}
-            />
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
+    <>
+      <HomeScreen
+        inputText={inputText}
+        setInputText={setInputText}
+        isLoading={isLoading}
+        errorMessage={errorMessage}
+        setErrorMessage={setErrorMessage}
+        onAnalyze={handleAnalyze}
+        onClear={handleClear}
+        onOpenVoiceModal={() => setShowVoiceModal(true)}
+        onOpenInbox={() => {
+          setShowNotificationInbox(true);
+          refreshNotificationCount();
+        }}
+        onOpenSimulateNotification={() => setShowSimulateNotification(true)}
+        onOpenNotificationSettings={() => setShowNotificationSettings(true)}
+        onOpenCalendarSettings={() => setShowCalendarSettings(true)}
+        onOpenCreatedEvents={() => setShowCreatedEvents(true)}
+        unreadNotificationCount={unreadNotificationCount}
+        analysisResult={analysisResult}
+        actionPlan={actionPlan}
+        calendarAgent={calendarAgent}
+        notificationProcessor={notificationProcessor}
+        refreshNotificationCount={refreshNotificationCount}
+      />
 
       {/* Voice Recognition Modal */}
       <VoiceInputModal
@@ -274,23 +239,6 @@ export const MainScreen: React.FC = () => {
         onClose={() => setShowCreatedEvents(false)}
         calendarAgent={calendarAgent}
       />
-    </SafeAreaView>
+    </>
   );
 };
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#020617',
-  },
-  keyboardAvoid: {
-    flex: 1,
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-});
