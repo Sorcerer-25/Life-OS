@@ -134,14 +134,9 @@ class LifeOSNotificationListenerModule(private val reactContext: ReactApplicatio
     fun requestRebind(promise: Promise) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                val service = LifeOSNotificationListenerService.activeListenerInstance
-                if (service != null) {
-                    service.requestRebind(ComponentName(reactContext, LifeOSNotificationListenerService::class.java))
-                } else {
-                    LifeOSNotificationListenerService.requestRebind(
-                        ComponentName(reactContext, LifeOSNotificationListenerService::class.java)
-                    )
-                }
+                android.service.notification.NotificationListenerService.requestRebind(
+                    ComponentName(reactContext, LifeOSNotificationListenerService::class.java)
+                )
             }
             promise.resolve(true)
         } catch (e: Exception) {

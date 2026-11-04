@@ -57,7 +57,7 @@ class LifeOSNotificationListenerService : NotificationListenerService() {
         LifeOSNotificationListenerModule.emitStatus(false)
         // Request rebind as required
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            requestRebind(ComponentName(this, LifeOSNotificationListenerService::class.java))
+            NotificationListenerService.requestRebind(ComponentName(this, LifeOSNotificationListenerService::class.java))
         }
     }
 

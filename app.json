@@ -41,6 +41,11 @@
       ],
       "expo-speech-recognition",
       "./plugins/withNotificationListener"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1a0d1069-ef65-4211-9843-4d0ad95f314c"
+      }
+    }
   }
 }
