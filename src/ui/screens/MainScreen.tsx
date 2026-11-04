@@ -22,12 +22,15 @@ import { CalendarSettingsModal } from '../components/CalendarSettingsModal';
 import { CreatedEventsModal } from '../components/CreatedEventsModal';
 import { NotificationInboxModal } from '../components/NotificationInboxModal';
 import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
+import { RemindersModal } from '../components/RemindersModal';
 import { SimulatedNotificationModal } from '../components/SimulatedNotificationModal';
 import { VoiceInputModal } from '../components/VoiceInputModal';
 import { BottomNavBar, TabKey } from '../components/core/BottomNavBar';
+import { ActivityHistoryScreen } from './ActivityHistoryScreen';
 import { HomeScreen } from './HomeScreen';
 import { InboxScreen } from './InboxScreen';
 import { InputScreen } from './InputScreen';
+import { SettingsScreen } from './SettingsScreen';
 
 const supervisor = new SupervisorAgent(0.6);
 const calendarAgent = new CalendarAgent();
@@ -44,6 +47,7 @@ export const MainScreen: React.FC = () => {
   // Modals state
   const [showCalendarSettings, setShowCalendarSettings] = useState<boolean>(false);
   const [showCreatedEvents, setShowCreatedEvents] = useState<boolean>(false);
+  const [showReminders, setShowReminders] = useState<boolean>(false);
   const [showVoiceModal, setShowVoiceModal] = useState<boolean>(false);
   const [showNotificationInbox, setShowNotificationInbox] = useState<boolean>(false);
   const [showSimulateNotification, setShowSimulateNotification] = useState<boolean>(false);
@@ -181,13 +185,14 @@ export const MainScreen: React.FC = () => {
           onClear={handleClear}
           onOpenVoiceModal={() => setShowVoiceModal(true)}
           onOpenInbox={() => {
-            setShowNotificationInbox(true);
+            setActiveTab('inbox');
             refreshNotificationCount();
           }}
           onOpenSimulateNotification={() => setShowSimulateNotification(true)}
-          onOpenNotificationSettings={() => setShowNotificationSettings(true)}
+          onOpenNotificationSettings={() => setActiveTab('settings')}
           onOpenCalendarSettings={() => setShowCalendarSettings(true)}
           onOpenCreatedEvents={() => setShowCreatedEvents(true)}
+          onOpenReminders={() => setShowReminders(true)}
           unreadNotificationCount={unreadNotificationCount}
           analysisResult={analysisResult}
           actionPlan={actionPlan}
@@ -217,7 +222,28 @@ export const MainScreen: React.FC = () => {
         <InboxScreen
           processor={notificationProcessor}
           onOpenSimulate={() => setShowSimulateNotification(true)}
-          onOpenSettings={() => setShowNotificationSettings(true)}
+          onOpenSettings={() => setActiveTab('settings')}
+        />
+      ) : activeTab === 'activity' ? (
+        <ActivityHistoryScreen
+          processor={notificationProcessor}
+          calendarAgent={calendarAgent}
+          onNavigateToInput={(suggestion) => {
+            if (suggestion) setInputText(suggestion);
+            setActiveTab('input');
+          }}
+          onOpenInbox={() => {
+            setActiveTab('inbox');
+            refreshNotificationCount();
+          }}
+        />
+      ) : activeTab === 'settings' ? (
+        <SettingsScreen
+          processor={notificationProcessor}
+          onClearAllData={async () => {
+            await notificationProcessor.getRepository().clearAll();
+            refreshNotificationCount();
+          }}
         />
       ) : null}
 
@@ -225,12 +251,9 @@ export const MainScreen: React.FC = () => {
       <BottomNavBar
         activeTab={activeTab}
         onSelectTab={(tab) => {
-          if (tab === 'settings') {
-            setShowNotificationSettings(true);
-          } else if (tab === 'activity') {
-            setActiveTab('inbox');
-          } else {
-            setActiveTab(tab);
+          setActiveTab(tab);
+          if (tab === 'inbox' || tab === 'home') {
+            refreshNotificationCount();
           }
         }}
         unreadInboxCount={unreadNotificationCount}
@@ -248,7 +271,7 @@ export const MainScreen: React.FC = () => {
         visible={showSimulateNotification}
         onClose={() => setShowSimulateNotification(false)}
         onOpenInbox={() => {
-          setShowNotificationInbox(true);
+          setActiveTab('inbox');
           refreshNotificationCount();
         }}
         processor={notificationProcessor}
@@ -284,6 +307,19 @@ export const MainScreen: React.FC = () => {
         visible={showCreatedEvents}
         onClose={() => setShowCreatedEvents(false)}
         calendarAgent={calendarAgent}
+      />
+
+      {/* Reminders Modal */}
+      <RemindersModal
+        visible={showReminders}
+        onClose={() => setShowReminders(false)}
+        calendarAgent={calendarAgent}
+        processor={notificationProcessor}
+        onNavigateToInput={(suggestion) => {
+          setShowReminders(false);
+          if (suggestion) setInputText(suggestion);
+          setActiveTab('input');
+        }}
       />
     </View>
   );

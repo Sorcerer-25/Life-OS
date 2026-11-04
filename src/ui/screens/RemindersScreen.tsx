@@ -25,8 +25,10 @@ import { StatusBadge } from '../components/core/StatusBadge';
 interface RemindersScreenProps {
   calendarAgent: CalendarAgent;
   processor: NotificationProcessor;
-  onNavigateToInput?: () => void;
+  onNavigateToInput?: (suggestion?: string) => void;
   onOpenInbox?: () => void;
+  onClose?: () => void;
+  isModal?: boolean;
 }
 
 export interface UnifiedReminderItem {
@@ -48,6 +50,8 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
   processor,
   onNavigateToInput,
   onOpenInbox,
+  onClose,
+  isModal = false,
 }) => {
   const { theme, toggleTheme } = useTheme();
 
@@ -213,6 +217,27 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
         statusLabel="Deterministic Engine"
         onToggleTheme={toggleTheme}
         onOpenInbox={onOpenInbox}
+        rightAction={
+          isModal && onClose ? (
+            <TouchableOpacity
+              onPress={onClose}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: theme.colors.surfaceSubtle,
+              }}
+              activeOpacity={0.7}
+              accessibilityLabel="Close"
+            >
+              <Text style={{ color: theme.colors.textPrimary, fontSize: 16 }}>✕</Text>
+            </TouchableOpacity>
+          ) : undefined
+        }
       />
 
       {/* Segmented Tab Controls: Upcoming vs. Past */}
@@ -308,7 +333,7 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
                 borderColor: theme.colors.border,
               },
             ]}
-            onPress={onNavigateToInput}
+            onPress={() => onNavigateToInput()}
             activeOpacity={0.7}
           >
             <Text style={[styles.refreshText, { color: theme.colors.accent }]}>

@@ -41,6 +41,7 @@ interface HomeScreenProps {
   onOpenNotificationSettings: () => void;
   onOpenCalendarSettings: () => void;
   onOpenCreatedEvents: () => void;
+  onOpenReminders?: () => void;
   unreadNotificationCount: number;
   analysisResult: IdentificationResult | null;
   actionPlan: ActionPlan | null;
@@ -91,6 +92,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenNotificationSettings,
   onOpenCalendarSettings,
   onOpenCreatedEvents,
+  onOpenReminders,
   unreadNotificationCount,
   analysisResult,
   actionPlan,
@@ -201,9 +203,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           activeOpacity={0.7}
         >
           <Text style={[styles.quickNavText, { color: theme.colors.textPrimary }]}>
-            🗓️ Calendar Events ({upcomingEvents.length})
+            🗓️ Calendar ({upcomingEvents.length})
           </Text>
         </TouchableOpacity>
+
+        {onOpenReminders && (
+          <TouchableOpacity
+            style={[
+              styles.quickNavPill,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
+            onPress={onOpenReminders}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.quickNavText, { color: theme.colors.textPrimary }]}>
+              ⏰ Reminders
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[
