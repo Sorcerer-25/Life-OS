@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  AppState,
+  AppStateStatus,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -13,18 +15,29 @@ import { createTextInputEvent, createVoiceInputEvent } from '../../input/inputCa
 import { IdentificationResult } from '../../intent/identifier';
 import { defaultIntentService } from '../../intent/intentService';
 import { ActionPlan } from '../../models/ActionPlan';
+import {
+  drainAndProcessQueue,
+  subscribeToLiveNotifications,
+  syncSettingsToNative,
+} from '../../notifications/nativeNotificationListener';
+import { NotificationProcessor } from '../../notifications/notificationProcessor';
+import { getNotificationSettings } from '../../notifications/notificationSettings';
 import { SupervisorAgent } from '../../supervisor/supervisor';
 import { VoiceLanguage } from '../../voice/voiceService';
 import { CalendarSettingsModal } from '../components/CalendarSettingsModal';
 import { CreatedEventsModal } from '../components/CreatedEventsModal';
 import { Header } from '../components/Header';
+import { NotificationInboxModal } from '../components/NotificationInboxModal';
+import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
 import { ResultsSection } from '../components/ResultsSection';
 import { SampleChips } from '../components/SampleChips';
+import { SimulatedNotificationModal } from '../components/SimulatedNotificationModal';
 import { TextInputSection } from '../components/TextInputSection';
 import { VoiceInputModal } from '../components/VoiceInputModal';
 
 const supervisor = new SupervisorAgent(0.6);
 const calendarAgent = new CalendarAgent();
+const notificationProcessor = new NotificationProcessor(undefined, undefined, calendarAgent);
 
 export const MainScreen: React.FC = () => {
   const [inputText, setInputText] = useState<string>('');
@@ -32,9 +45,58 @@ export const MainScreen: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<IdentificationResult | null>(null);
   const [actionPlan, setActionPlan] = useState<ActionPlan | null>(null);
+
+  // Modals state
   const [showCalendarSettings, setShowCalendarSettings] = useState<boolean>(false);
   const [showCreatedEvents, setShowCreatedEvents] = useState<boolean>(false);
   const [showVoiceModal, setShowVoiceModal] = useState<boolean>(false);
+  const [showNotificationInbox, setShowNotificationInbox] = useState<boolean>(false);
+  const [showSimulateNotification, setShowSimulateNotification] = useState<boolean>(false);
+  const [showNotificationSettings, setShowNotificationSettings] = useState<boolean>(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState<number>(0);
+
+  const refreshNotificationCount = async () => {
+    try {
+      const repo = notificationProcessor.getRepository();
+      const newItems = await repo.listAll('new');
+      setUnreadNotificationCount(newItems.length);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    refreshNotificationCount();
+
+    // 1. Initial drain of native queue on launch
+    drainAndProcessQueue(notificationProcessor).then(() => {
+      refreshNotificationCount();
+    });
+
+    // 2. Sync current settings to native SharedPreferences on launch
+    const settings = getNotificationSettings();
+    syncSettingsToNative(settings.captureEnabled, settings.allowedApps);
+
+    // 3. Listen for live incoming notifications while app is in foreground
+    const liveSub = subscribeToLiveNotifications(async (event) => {
+      await notificationProcessor.processNotification(event);
+      refreshNotificationCount();
+    });
+
+    // 4. Drain queue whenever app returns to foreground from background
+    const appStateSub = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        drainAndProcessQueue(notificationProcessor).then(() => {
+          refreshNotificationCount();
+        });
+      }
+    });
+
+    return () => {
+      liveSub.remove();
+      appStateSub.remove();
+    };
+  }, []);
 
   const handleSelectSample = (sample: string) => {
     setInputText(sample);
@@ -126,6 +188,13 @@ export const MainScreen: React.FC = () => {
           <Header
             onOpenCalendarSettings={() => setShowCalendarSettings(true)}
             onOpenCreatedEvents={() => setShowCreatedEvents(true)}
+            onOpenNotificationInbox={() => {
+              setShowNotificationInbox(true);
+              refreshNotificationCount();
+            }}
+            onOpenSimulateNotification={() => setShowSimulateNotification(true)}
+            onOpenNotificationSettings={() => setShowNotificationSettings(true)}
+            unreadNotificationCount={unreadNotificationCount}
           />
 
           {/* Test Acceptance Sample Chips */}
@@ -161,6 +230,36 @@ export const MainScreen: React.FC = () => {
         visible={showVoiceModal}
         onClose={() => setShowVoiceModal(false)}
         onSendTranscript={handleVoiceSend}
+      />
+
+      {/* Notification Modals */}
+      <SimulatedNotificationModal
+        visible={showSimulateNotification}
+        onClose={() => setShowSimulateNotification(false)}
+        onOpenInbox={() => {
+          setShowNotificationInbox(true);
+          refreshNotificationCount();
+        }}
+        processor={notificationProcessor}
+        onNotificationProcessed={refreshNotificationCount}
+      />
+
+      <NotificationInboxModal
+        visible={showNotificationInbox}
+        onClose={() => {
+          setShowNotificationInbox(false);
+          refreshNotificationCount();
+        }}
+        processor={notificationProcessor}
+      />
+
+      <NotificationSettingsModal
+        visible={showNotificationSettings}
+        onClose={() => setShowNotificationSettings(false)}
+        onClearAllNotifications={async () => {
+          await notificationProcessor.getRepository().clearAll();
+          refreshNotificationCount();
+        }}
       />
 
       {/* Calendar Settings Modal */}

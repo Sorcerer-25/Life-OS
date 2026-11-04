@@ -7,7 +7,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,8 +23,10 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.READ_CALENDAR",
-        "android.permission.WRITE_CALENDAR"
-      ]
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.lifeostemp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,7 +39,8 @@
           "calendarPermission": "LifeOS needs access to your calendar to schedule and manage events."
         }
       ],
-      "expo-speech-recognition"
+      "expo-speech-recognition",
+      "./plugins/withNotificationListener"
     ]
   }
 }

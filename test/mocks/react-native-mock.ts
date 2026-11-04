@@ -14,9 +14,37 @@ export const AppRegistry = {
   registerComponent: jest.fn(),
 };
 
+export const NativeModules: Record<string, any> = {
+  LifeOSNotificationListener: {
+    isPermissionGranted: jest.fn().mockResolvedValue(false),
+    openNotificationSettings: jest.fn().mockResolvedValue(true),
+    getListenerStatus: jest.fn().mockResolvedValue({
+      isPermissionGranted: false,
+      isConnected: false,
+      captureEnabled: false,
+      queueSize: 0,
+    }),
+    requestRebind: jest.fn().mockResolvedValue(true),
+    updateSettings: jest.fn().mockResolvedValue(true),
+    drainPendingNotifications: jest.fn().mockResolvedValue([]),
+  },
+};
+
+export class NativeEventEmitter {
+  addListener = jest.fn().mockReturnValue({ remove: jest.fn() });
+  removeListeners = jest.fn();
+}
+
+export const AppState = {
+  addEventListener: jest.fn().mockReturnValue({ remove: jest.fn() }),
+};
+
 export default {
   Linking,
   Platform,
   AppRegistry,
+  NativeModules,
+  NativeEventEmitter,
+  AppState,
 };
 

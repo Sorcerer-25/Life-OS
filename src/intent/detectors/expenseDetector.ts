@@ -122,9 +122,19 @@ export function detectExpenseIntent(
     };
   }
 
-  // 3. Completed Expense: "I paid ₹500 for groceries", "I spent ₹200 on lunch", "received a refund of ₹500"
+  // Prompt-injection or status commands must never become completed expenses
+  if (/\b(mark\s+as\s+paid|marked\s+as\s+paid|ignore\s+(?:all\s+|your\s+)?rules)\b/i.test(lower)) {
+    return null;
+  }
+
+  // Promotional ads, discounts, vouchers, coupons must never become completed expenses
+  if (/\b(promo|promotion|coupon|voucher|flat\s+\d+%\s+off|cashback|offer)\b/i.test(lower)) {
+    return null;
+  }
+
+  // 3. Completed Expense: "I paid ₹500 for groceries", "I spent ₹200 on lunch", "received a refund of ₹500", "INR 1,500 debited"
   if (
-    /\b(spent|paid|bought|purchased|refund|received\s+a\s+refund|cost\s+me)\b/.test(lower)
+    /\b(spent|paid|bought|purchased|refund|received\s+a\s+refund|cost\s+me|debited)\b/.test(lower)
   ) {
     const amountInfo = extractAmount(text);
     const dateInfo = extractDate(text, baseDate);
