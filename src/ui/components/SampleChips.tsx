@@ -1,5 +1,6 @@
+import { ScalePressable } from './core/Motion';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 interface SampleChipsProps {
   onSelectSample: (text: string) => void;
@@ -22,8 +23,7 @@ export const SampleChips: React.FC<SampleChipsProps> = ({ onSelectSample }) => {
       <Text style={styles.sectionLabel}>Test Acceptance Samples (Tap to fill):</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {SAMPLE_INPUTS.map((sample, idx) => (
-          <TouchableOpacity
-            key={idx}
+          <ScalePressable key={idx}
             style={styles.chip}
             activeOpacity={0.7}
             onPress={() => onSelectSample(sample)}
@@ -31,7 +31,7 @@ export const SampleChips: React.FC<SampleChipsProps> = ({ onSelectSample }) => {
             <Text style={styles.chipText} numberOfLines={1}>
               {sample}
             </Text>
-          </TouchableOpacity>
+          </ScalePressable>
         ))}
       </ScrollView>
     </View>
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   sectionLabel: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     color: '#64748b',
     textTransform: 'uppercase',
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: '#38bdf8',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '500',
   },
 });

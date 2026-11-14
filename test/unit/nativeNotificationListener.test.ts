@@ -9,10 +9,12 @@ import {
   RawNativeNotification,
   requestRebindListener,
   syncSettingsToNative,
+  getSettingsFromNative,
 } from '../../src/notifications/nativeNotificationListener';
 import { NotificationProcessor } from '../../src/notifications/notificationProcessor';
 import {
   addAppToAllowList,
+  loadNotificationSettings,
   resetNotificationSettings,
   updateNotificationSettings,
 } from '../../src/notifications/notificationSettings';
@@ -24,6 +26,7 @@ const mockNativeListener = {
   getListenerStatus: jest.fn(),
   requestRebind: jest.fn(),
   updateSettings: jest.fn(),
+  getSettings: jest.fn(),
   drainPendingNotifications: jest.fn(),
 };
 
@@ -84,6 +87,29 @@ describe('NativeNotificationListener & Queue Draining Suite', () => {
         true,
         ['com.axis.mobile', 'com.google.android.calendar']
       );
+    });
+
+    it('retrieves settings from native SharedPreferences', async () => {
+      mockNativeListener.getSettings.mockResolvedValueOnce({
+        captureEnabled: true,
+        allowedApps: ['com.whatsapp', 'com.google.android.apps.messaging'],
+      });
+      const res = await getSettingsFromNative();
+      expect(res).toEqual({
+        captureEnabled: true,
+        allowedApps: ['com.whatsapp', 'com.google.android.apps.messaging'],
+      });
+      expect(mockNativeListener.getSettings).toHaveBeenCalled();
+    });
+
+    it('loads persisted settings from native SharedPreferences when storage has not been initialized', async () => {
+      mockNativeListener.getSettings.mockResolvedValueOnce({
+        captureEnabled: true,
+        allowedApps: ['com.whatsapp'],
+      });
+      const loaded = await loadNotificationSettings();
+      expect(loaded.captureEnabled).toBe(true);
+      expect(loaded.allowedApps).toContain('com.whatsapp');
     });
   });
 

@@ -49,12 +49,12 @@ export const IntentCard: React.FC<IntentCardProps> = ({ item, style }) => {
             style={[
               styles.intentBadge,
               {
-                backgroundColor: theme.colors.primaryMuted,
-                borderColor: theme.colors.primaryDark,
+                backgroundColor: theme.colors.surfaceSubtle,
+                borderColor: theme.colors.textSecondary,
               },
             ]}
           >
-            <Text style={[styles.intentBadgeText, { color: theme.colors.primaryLight }]}>
+            <Text style={[styles.intentBadgeText, { color: theme.colors.textPrimary }]}>
               {item.intent}
             </Text>
           </View>
@@ -91,7 +91,7 @@ export const IntentCard: React.FC<IntentCardProps> = ({ item, style }) => {
               { color: theme.colors.textPrimary, fontStyle: 'italic', marginTop: 1 },
             ]}
           >
-            "{item.raw_segment}"
+            &quot;{item.raw_segment}&quot;
           </Text>
         </View>
       ) : null}
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   seqText: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '800',
   },
   intentBadge: {
@@ -203,14 +203,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   intentBadgeText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   confidenceCol: {
     alignItems: 'flex-end',
   },
   confidenceValue: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
   clauseBox: {
@@ -227,12 +227,12 @@ const styles = StyleSheet.create({
   },
   entityKey: {
     width: 100,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   entityVal: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   completeRow: {
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   checkmark: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
   missingBox: {

@@ -1,39 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScalePressable } from '../components/core/Motion';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CalendarAdapter } from '../../calendar/calendarAdapter';
 import { CalendarAgent } from '../../calendar/calendarAgent';
-import {
-  formatCalendarSourceDescription,
-  getCalendarPreferences,
-  listWritableCalendars,
-  setSelectedCalendarId,
-} from '../../calendar/calendarSettings';
+import { formatCalendarSourceDescription, getCalendarPreferences, listWritableCalendars, setSelectedCalendarId } from '../../calendar/calendarSettings';
 import { CalendarMappingRecord } from '../../calendar/mappingRepository';
-import {
-  CalendarEventRecord,
-  CalendarInfo,
-  CalendarPermissionResponse,
-  CalendarPreferences,
-} from '../../calendar/types';
+import { CalendarEventRecord, CalendarInfo, CalendarPermissionResponse, CalendarPreferences } from '../../calendar/types';
 import { ExpoCalendarAdapter } from '../../calendar/expoCalendarAdapter';
 import { useTheme } from '../theme';
 import { AppHeader } from '../components/core/AppHeader';
 import { BottomSheet } from '../components/core/BottomSheet';
 import { ConfirmationDialog } from '../components/core/ConfirmationDialog';
 import { EmptyState } from '../components/core/EmptyState';
+import { Icon } from '../components/core/Icon';
+
 import { LoadingState } from '../components/core/LoadingState';
 import { PrimaryButton } from '../components/core/PrimaryButton';
 import { ScreenContainer } from '../components/core/ScreenContainer';
 import { SecondaryButton } from '../components/core/SecondaryButton';
-import { SectionHeader } from '../components/core/SectionHeader';
+
 import { StatusBadge } from '../components/core/StatusBadge';
 
 const defaultAdapter = new ExpoCalendarAdapter();
@@ -57,10 +42,10 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
   onClose,
   isModal = false,
 }) => {
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
   const [events, setEvents] = useState<
-    Array<{ mapping: CalendarMappingRecord; event: CalendarEventRecord | null }>
+    { mapping: CalendarMappingRecord; event: CalendarEventRecord | null }[]
   >([]);
   const [permission, setPermission] = useState<CalendarPermissionResponse | null>(null);
   const [writableCalendars, setWritableCalendars] = useState<CalendarInfo[]>([]);
@@ -81,7 +66,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
   // Show destination calendar selector toggle
   const [showCalendarSelector, setShowCalendarSelector] = useState<boolean>(false);
 
-  const loadCalendarData = async () => {
+  const loadCalendarData = useCallback(async () => {
     setIsLoading(true);
     try {
       // 1. Check permissions
@@ -112,11 +97,11 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [adapter, calendarAgent]);
 
   useEffect(() => {
-    loadCalendarData();
-  }, []);
+    void Promise.resolve().then(loadCalendarData);
+  }, [loadCalendarData]);
 
   const handleRequestPermission = async () => {
     try {
@@ -186,7 +171,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
   // Group agenda events by day
   const groupedEvents = activeEvents.reduce(
     (
-      acc: Record<string, Array<{ mapping: CalendarMappingRecord; event: CalendarEventRecord | null }>>,
+      acc: Record<string, { mapping: CalendarMappingRecord; event: CalendarEventRecord | null }[]>,
       item
     ) => {
       const eventDate = item.event
@@ -229,13 +214,10 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
         title="Calendar Agenda"
         subtitle="Android CalendarProvider • Verified on-device synchronization"
         showStatusIndicator
-        statusLabel="Deterministic Engine"
-        onToggleTheme={toggleTheme}
-        onOpenInbox={onOpenInbox}
+        statusLabel="Offline"
         rightAction={
           isModal && onClose ? (
-            <TouchableOpacity
-              style={[
+            <ScalePressable style={[
                 styles.modalCloseBtn,
                 {
                   backgroundColor: theme.colors.surfaceSubtle,
@@ -246,7 +228,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
               activeOpacity={0.7}
             >
               <Text style={{ fontSize: 16 }}>✕</Text>
-            </TouchableOpacity>
+            </ScalePressable>
           ) : undefined
         }
       />
@@ -266,7 +248,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
           ]}
         >
           <Text style={[theme.typography.titleSmall, { color: theme.colors.errorForeground }]}>
-            ⚠️ Android Calendar Access Required
+             Android Calendar Access Required
           </Text>
           <Text
             style={[
@@ -274,21 +256,21 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
               { color: theme.colors.textPrimary, marginTop: 4, lineHeight: 18 },
             ]}
           >
-            LifeOS interacts with your Android device's native CalendarProvider. To view, create, and manage calendar events, please grant calendar access.
+            LifeOS interacts with your Android device&apos;s native CalendarProvider. To view, create, and manage calendar events, please grant calendar access.
           </Text>
 
           <View style={{ marginTop: theme.spacing.sm, flexDirection: 'row', gap: 8 }}>
             {permission?.status === 'denied_permanently' ? (
               <PrimaryButton
                 label="Open Phone Settings"
-                icon="⚙️"
+                icon="x"
                 onPress={() => adapter.openSettingsAsync()}
                 size="sm"
               />
             ) : (
               <PrimaryButton
                 label="Grant Calendar Access"
-                icon="✓"
+                icon="x"
                 onPress={handleRequestPermission}
                 size="sm"
               />
@@ -311,8 +293,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
           theme.shadows.sm,
         ]}
       >
-        <TouchableOpacity
-          style={styles.destinationToggleRow}
+        <ScalePressable style={styles.destinationToggleRow}
           onPress={() => setShowCalendarSelector(!showCalendarSelector)}
           activeOpacity={0.7}
         >
@@ -332,10 +313,10 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
             </Text>
           </View>
 
-          <Text style={[styles.arrowText, { color: theme.colors.primaryLight }]}>
+          <Text style={[styles.arrowText, { color: theme.colors.textPrimary }]}>
             {showCalendarSelector ? '▲ Hide' : '▼ Change'}
           </Text>
-        </TouchableOpacity>
+        </ScalePressable>
 
         {showCalendarSelector && (
           <View style={{ marginTop: theme.spacing.md, gap: theme.spacing.xs }}>
@@ -345,15 +326,14 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
             {writableCalendars.map((cal) => {
               const isSelected = preferences?.selectedCalendarId === cal.id;
               return (
-                <TouchableOpacity
-                  key={cal.id}
+                <ScalePressable key={cal.id}
                   style={[
                     styles.calOption,
                     {
                       backgroundColor: isSelected
-                        ? theme.colors.primaryMuted
+                        ? theme.colors.surfaceSubtle
                         : theme.colors.surfaceSubtle,
-                      borderColor: isSelected ? theme.colors.primaryLight : theme.colors.border,
+                      borderColor: isSelected ? theme.colors.textPrimary : theme.colors.border,
                       borderRadius: theme.radii.sm,
                       padding: theme.spacing.sm,
                     },
@@ -371,7 +351,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
                           <View
                             style={[
                               styles.primaryPill,
-                              { backgroundColor: theme.colors.primaryLight },
+                              { backgroundColor: theme.colors.textPrimary },
                             ]}
                           >
                             <Text style={styles.primaryPillText}>PRIMARY</Text>
@@ -388,11 +368,13 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
                       </Text>
                     </View>
 
-                    <Text style={{ color: isSelected ? theme.colors.primaryLight : theme.colors.textMuted, fontSize: 16 }}>
-                      {isSelected ? '🔘' : '⚪'}
-                    </Text>
+                    <Icon
+                      name={isSelected ? 'check-circle' : 'circle'}
+                      size={18}
+                      color={isSelected ? theme.colors.info : theme.colors.textMuted}
+                    />
                   </View>
-                </TouchableOpacity>
+                </ScalePressable>
               );
             })}
 
@@ -409,16 +391,19 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
                 },
               ]}
             >
-              <Text style={[theme.typography.caption, { color: theme.colors.infoForeground, fontWeight: '700' }]}>
-                ℹ️ Google Account Synchronization Transparency:
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Icon name="info" size={18} color={theme.colors.infoForeground} />
+                <Text style={[theme.typography.caption, { color: theme.colors.infoForeground, fontWeight: '700' }]}>
+                  Google Account Synchronization Transparency:
+                </Text>
+              </View>
               <Text
                 style={[
                   theme.typography.caption,
-                  { color: theme.colors.textSecondary, marginTop: 2, lineHeight: 15 },
+                  { color: theme.colors.textSecondary, marginTop: 4, lineHeight: 15 },
                 ]}
               >
-                LifeOS inserts directly into Android's native CalendarProvider. Cloud sync to Google Calendar on the web depends entirely on Android account synchronization being enabled for that Google account on this device.
+                LifeOS inserts directly into Android&apos;s native CalendarProvider. Cloud sync to Google Calendar on the web depends entirely on Android account synchronization being enabled for that Google account on this device.
               </Text>
             </View>
           </View>
@@ -427,38 +412,44 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
 
       {/* Action Row: Refresh & Quick Create */}
       <View style={styles.actionRow}>
-        <TouchableOpacity
-          style={[
+        <ScalePressable style={[
             styles.actionPill,
             {
               backgroundColor: theme.colors.surface,
               borderColor: theme.colors.border,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
             },
           ]}
           onPress={loadCalendarData}
           activeOpacity={0.7}
         >
-          <Text style={[styles.actionPillText, { color: theme.colors.primaryLight }]}>
-            🔄 Refresh Agenda
+          <Icon name="refresh-cw" size={18} color={theme.colors.info} />
+          <Text style={[styles.actionPillText, { color: theme.colors.info }]}>
+            Refresh Agenda
           </Text>
-        </TouchableOpacity>
+        </ScalePressable>
 
         {onNavigateToInput && (
-          <TouchableOpacity
-            style={[
+          <ScalePressable style={[
               styles.actionPill,
               {
                 backgroundColor: theme.colors.surface,
                 borderColor: theme.colors.border,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
               },
             ]}
             onPress={onNavigateToInput}
             activeOpacity={0.7}
           >
-            <Text style={[styles.actionPillText, { color: theme.colors.accent }]}>
-              + Schedule Event
+            <Icon name="plus" size={18} color={theme.colors.info} />
+            <Text style={[styles.actionPillText, { color: theme.colors.info }]}>
+              Schedule Event
             </Text>
-          </TouchableOpacity>
+          </ScalePressable>
         )}
       </View>
 
@@ -467,7 +458,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
         <LoadingState message="Loading calendar events from Android provider..." />
       ) : groupKeys.length === 0 ? (
         <EmptyState
-          icon="🗓️"
+          icon="calendar"
           title="No Scheduled Events"
           description={
             permission?.granted
@@ -483,9 +474,12 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
             <View key={dayLabel} style={styles.dayGroup}>
               {/* Day Header */}
               <View style={styles.dayHeaderRow}>
-                <Text style={[theme.typography.titleSmall, { color: theme.colors.primaryLight }]}>
-                  🗓️ {dayLabel}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Icon name="calendar" size={18} color={theme.colors.info} />
+                  <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
+                    {dayLabel}
+                  </Text>
+                </View>
                 <Text style={[theme.typography.caption, { color: theme.colors.textTertiary }]}>
                   {groupedEvents[dayLabel].length} event{groupedEvents[dayLabel].length === 1 ? '' : 's'}
                 </Text>
@@ -518,34 +512,42 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
 
                           {event ? (
                             <View style={{ marginTop: 2 }}>
-                              <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
-                                ⏰{' '}
-                                {new Date(event.startDate).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}{' '}
-                                –{' '}
-                                {new Date(event.endDate).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <Icon name="clock" size={18} color={theme.colors.textSecondary} />
+                                <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
+                                  {new Date(event.startDate).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}{' '}
+                                  –{' '}
+                                  {new Date(event.endDate).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </Text>
+                              </View>
 
                               {event.location ? (
-                                <Text
-                                  style={[
-                                    theme.typography.caption,
-                                    { color: theme.colors.textSecondary, marginTop: 1 },
-                                  ]}
-                                >
-                                  📍 {event.location}
-                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                  <Icon name="target" size={18} color={theme.colors.textSecondary} />
+                                  <Text
+                                    style={[
+                                      theme.typography.caption,
+                                      { color: theme.colors.textSecondary },
+                                    ]}
+                                  >
+                                    {event.location}
+                                  </Text>
+                                </View>
                               ) : null}
                             </View>
                           ) : (
-                            <Text style={[theme.typography.caption, { color: theme.colors.errorForeground, marginTop: 2 }]}>
-                              ⚠️ Event not found in device provider
-                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                              <Icon name="alert-triangle" size={18} color={theme.colors.error} />
+                              <Text style={[theme.typography.caption, { color: theme.colors.errorForeground }]}>
+                                Event not found in device provider
+                              </Text>
+                            </View>
                           )}
                         </View>
 
@@ -578,18 +580,19 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
                         {event && (
                           <SecondaryButton
                             label="Edit"
-                            icon="✏️"
                             onPress={() => handleStartEdit(mapping.action_id, event)}
                             size="sm"
                           />
                         )}
 
-                        <TouchableOpacity
-                          style={[
+                        <ScalePressable style={[
                             styles.deleteBtn,
                             {
                               backgroundColor: theme.colors.errorSurface,
                               borderColor: theme.colors.errorBorder,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
                             },
                           ]}
                           onPress={() =>
@@ -600,10 +603,11 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
                           }
                           activeOpacity={0.7}
                         >
+                          <Icon name="trash-2" size={18} color={theme.colors.errorForeground} />
                           <Text style={[styles.deleteBtnText, { color: theme.colors.errorForeground }]}>
-                            🗑️ Delete
+                            Delete
                           </Text>
-                        </TouchableOpacity>
+                        </ScalePressable>
                       </View>
                     </View>
                   );
@@ -647,7 +651,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({
               <View style={{ flex: 1 }}>
                 <PrimaryButton
                   label="Save Changes"
-                  icon="✓"
+                  icon="x"
                   onPress={handleSaveEdit}
                 />
               </View>
@@ -728,7 +732,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   arrowText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   calOption: {
@@ -747,7 +751,7 @@ const styles = StyleSheet.create({
   },
   primaryPillText: {
     color: '#ffffff',
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '800',
   },
   disclaimerBox: {
@@ -765,7 +769,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   actionPillText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   dayGroup: {
@@ -806,7 +810,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   deleteBtnText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   sheetFooterRow: {

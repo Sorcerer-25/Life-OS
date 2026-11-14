@@ -1,15 +1,6 @@
+
 import React from 'react';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
 import { useTheme } from '../../theme';
 import { IconButton } from './IconButton';
 
@@ -48,7 +39,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardContainer}
+          style={[styles.keyboardContainer, { maxHeight: `${maxHeightPercent}%` }]}
         >
           <View
             style={[
@@ -58,7 +49,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                 borderColor: theme.colors.border,
                 borderTopLeftRadius: theme.radii.xl,
                 borderTopRightRadius: theme.radii.xl,
-                maxHeight: `${maxHeightPercent}%`,
+                maxHeight: '100%',
+                flexShrink: 1,
               },
               theme.shadows.lg,
             ]}
@@ -96,7 +88,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
               </View>
 
               <IconButton
-                icon="✕"
+                icon="x"
                 onPress={onClose}
                 accessibilityLabel="Close sheet"
                 size="sm"

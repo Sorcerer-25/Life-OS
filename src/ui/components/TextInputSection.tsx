@@ -1,12 +1,13 @@
+import { ScalePressable } from './core/Motion';
 import React from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
-  View,
+    View,
 } from 'react-native';
+import { Icon } from './core/Icon';
 
 interface TextInputSectionProps {
   inputText: string;
@@ -32,7 +33,7 @@ export const TextInputSection: React.FC<TextInputSectionProps> = ({
       <View style={styles.headerRow}>
         <Text style={styles.label}>Natural Language Input</Text>
         <View style={styles.modeTag}>
-          <Text style={styles.modeTagText}>Deterministic Engine</Text>
+          <Text style={styles.modeTagText}>Offline</Text>
         </View>
       </View>
 
@@ -49,13 +50,12 @@ export const TextInputSection: React.FC<TextInputSectionProps> = ({
 
       {errorMessage ? (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+          <Text style={styles.errorText}> {errorMessage}</Text>
         </View>
       ) : null}
 
       <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={styles.clearButton}
+        <ScalePressable style={styles.clearButton}
           onPress={onClear}
           disabled={isLoading || !inputText.trim()}
         >
@@ -67,34 +67,36 @@ export const TextInputSection: React.FC<TextInputSectionProps> = ({
           >
             Clear
           </Text>
-        </TouchableOpacity>
+        </ScalePressable>
 
         {onOpenVoiceModal && (
-          <TouchableOpacity
-            style={styles.voiceButton}
+          <ScalePressable style={styles.voiceButton}
             onPress={onOpenVoiceModal}
             disabled={isLoading}
             activeOpacity={0.8}
           >
-            <Text style={styles.voiceButtonText}>🎤 Voice</Text>
-          </TouchableOpacity>
+            <Icon name="mic" size={18} color="#38bdf8" />
+            <Text style={[styles.voiceButtonText, { marginLeft: 4 }]}>Voice</Text>
+          </ScalePressable>
         )}
 
-        <TouchableOpacity
-          style={[styles.analyzeButton, (!inputText.trim() || isLoading) && styles.buttonDisabled]}
+        <ScalePressable style={[styles.analyzeButton, (!inputText.trim() || isLoading) && styles.buttonDisabled]}
           onPress={onAnalyze}
           disabled={isLoading || !inputText.trim()}
           activeOpacity={0.8}
         >
           {isLoading ? (
             <View style={styles.loadingRow}>
-              <ActivityIndicator color="#0f172a" size="small" />
+              <ActivityIndicator color="#0B0F14" size="small" />
               <Text style={styles.analyzeButtonTextLoading}>Processing...</Text>
             </View>
           ) : (
-            <Text style={styles.analyzeButtonText}>⚡ Analyze & Plan</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="zap" size={18} color="#0B0F14" />
+              <Text style={styles.analyzeButtonText}>Analyze & Plan</Text>
+            </View>
           )}
-        </TouchableOpacity>
+        </ScalePressable>
       </View>
     </View>
   );
@@ -116,7 +118,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   label: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#f8fafc',
     letterSpacing: 0.3,
@@ -130,7 +132,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(56, 189, 248, 0.3)',
   },
   modeTagText: {
-    fontSize: 10,
+    fontSize: 13,
     color: '#38bdf8',
     fontWeight: '700',
   },
@@ -155,8 +157,8 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#fca5a5',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 22,
   },
   actionsRow: {
     flexDirection: 'row',

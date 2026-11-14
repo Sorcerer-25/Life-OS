@@ -8,6 +8,7 @@ module.exports = {
     '^expo-calendar$': '<rootDir>/test/mocks/expo-calendar-mock.ts',
     '^expo-sqlite$': '<rootDir>/test/mocks/expo-sqlite-mock.ts',
     '^expo-speech-recognition$': '<rootDir>/test/mocks/expo-speech-recognition-mock.ts',
+    '^@expo/vector-icons.*$': '<rootDir>/test/mocks/expo-vector-icons-mock.ts',
     '^react-native$': '<rootDir>/test/mocks/react-native-mock.ts',
   },
   transform: {

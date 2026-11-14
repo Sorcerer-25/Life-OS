@@ -26,6 +26,10 @@ export const NativeModules: Record<string, any> = {
     }),
     requestRebind: jest.fn().mockResolvedValue(true),
     updateSettings: jest.fn().mockResolvedValue(true),
+    getSettings: jest.fn().mockResolvedValue({
+      captureEnabled: false,
+      allowedApps: [],
+    }),
     drainPendingNotifications: jest.fn().mockResolvedValue([]),
   },
 };

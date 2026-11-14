@@ -125,6 +125,26 @@ export async function syncSettingsToNative(
 }
 
 /**
+ * Retrieves captureEnabled and allowedApps saved in native Android SharedPreferences.
+ */
+export async function getSettingsFromNative(): Promise<{ captureEnabled: boolean; allowedApps: string[] } | null> {
+  const mod = getNativeModule();
+  if (Platform.OS !== 'android' || !mod || typeof mod.getSettings !== 'function') {
+    return null;
+  }
+  try {
+    const res = await mod.getSettings();
+    return {
+      captureEnabled: Boolean(res?.captureEnabled),
+      allowedApps: Array.isArray(res?.allowedApps) ? res.allowedApps : [],
+    };
+  } catch (err) {
+    console.warn('[NativeNotificationListener] Error getting settings from native:', err);
+    return null;
+  }
+}
+
+/**
  * Drains the native on-device persistent queue into JavaScript.
  */
 export async function drainPendingNotifications(): Promise<RawNativeNotification[]> {

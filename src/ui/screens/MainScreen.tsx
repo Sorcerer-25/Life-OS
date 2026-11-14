@@ -1,326 +1,121 @@
-import React, { useEffect, useState } from 'react';
-import {
-  AppState,
-  AppStateStatus,
-  View,
-} from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AppState, View } from 'react-native';
+import { router, Slot, usePathname } from 'expo-router';
 import { CalendarAgent } from '../../calendar/calendarAgent';
 import { createTextInputEvent, createVoiceInputEvent } from '../../input/inputCapture';
 import { IdentificationResult } from '../../intent/identifier';
 import { defaultIntentService } from '../../intent/intentService';
 import { ActionPlan } from '../../models/ActionPlan';
-import {
-  drainAndProcessQueue,
-  subscribeToLiveNotifications,
-  syncSettingsToNative,
-} from '../../notifications/nativeNotificationListener';
+import { drainAndProcessQueue, subscribeToLiveNotifications, syncSettingsToNative } from '../../notifications/nativeNotificationListener';
 import { NotificationProcessor } from '../../notifications/notificationProcessor';
-import { getNotificationSettings } from '../../notifications/notificationSettings';
+import { loadNotificationSettings } from '../../notifications/notificationSettings';
 import { SupervisorAgent } from '../../supervisor/supervisor';
 import { VoiceLanguage } from '../../voice/voiceService';
+import { AppScreenContext, AppScreens } from '../AppScreenContext';
+import { useTheme } from '../theme';
 import { CalendarSettingsModal } from '../components/CalendarSettingsModal';
 import { CreatedEventsModal } from '../components/CreatedEventsModal';
-import { NotificationInboxModal } from '../components/NotificationInboxModal';
-import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
 import { RemindersModal } from '../components/RemindersModal';
 import { SimulatedNotificationModal } from '../components/SimulatedNotificationModal';
 import { VoiceInputModal } from '../components/VoiceInputModal';
+import { QuickInputSheet, RecentRequest } from '../components/QuickInputSheet';
 import { BottomNavBar, TabKey } from '../components/core/BottomNavBar';
-import { ActivityHistoryScreen } from './ActivityHistoryScreen';
-import { HomeScreen } from './HomeScreen';
-import { InboxScreen } from './InboxScreen';
-import { InputScreen } from './InputScreen';
-import { SettingsScreen } from './SettingsScreen';
+import { Entrance } from '../components/core/Motion';
 
 const supervisor = new SupervisorAgent(0.6);
 const calendarAgent = new CalendarAgent();
 const notificationProcessor = new NotificationProcessor(undefined, undefined, calendarAgent);
+const paths = { home: '/', inbox: '/inbox', activity: '/activity', settings: '/settings' } as const;
 
 export const MainScreen: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabKey>('home');
-  const [inputText, setInputText] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const pathname = usePathname();
+  const activeTab: TabKey = pathname === '/inbox' ? 'inbox' : pathname === '/activity' ? 'activity' : pathname === '/settings' ? 'settings' : 'home';
+  const { theme } = useTheme();
+  const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<IdentificationResult | null>(null);
   const [actionPlan, setActionPlan] = useState<ActionPlan | null>(null);
-
-  // Modals state
-  const [showCalendarSettings, setShowCalendarSettings] = useState<boolean>(false);
-  const [showCreatedEvents, setShowCreatedEvents] = useState<boolean>(false);
-  const [showReminders, setShowReminders] = useState<boolean>(false);
-  const [showVoiceModal, setShowVoiceModal] = useState<boolean>(false);
-  const [showNotificationInbox, setShowNotificationInbox] = useState<boolean>(false);
-  const [showSimulateNotification, setShowSimulateNotification] = useState<boolean>(false);
-  const [showNotificationSettings, setShowNotificationSettings] = useState<boolean>(false);
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState<number>(0);
-
-  const refreshNotificationCount = async () => {
-    try {
-      const repo = notificationProcessor.getRepository();
-      const newItems = await repo.listAll('new');
-      setUnreadNotificationCount(newItems.length);
-    } catch {
-      // ignore
-    }
-  };
-
-  useEffect(() => {
-    refreshNotificationCount();
-
-    // 1. Initial drain of native queue on launch
-    drainAndProcessQueue(notificationProcessor).then(() => {
-      refreshNotificationCount();
-    });
-
-    // 2. Sync current settings to native SharedPreferences on launch
-    const settings = getNotificationSettings();
-    syncSettingsToNative(settings.captureEnabled, settings.allowedApps);
-
-    // 3. Listen for live incoming notifications while app is in foreground
-    const liveSub = subscribeToLiveNotifications(async (event) => {
-      await notificationProcessor.processNotification(event);
-      refreshNotificationCount();
-    });
-
-    // 4. Drain queue whenever app returns to foreground from background
-    const appStateSub = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active') {
-        drainAndProcessQueue(notificationProcessor).then(() => {
-          refreshNotificationCount();
-        });
-      }
-    });
-
-    return () => {
-      liveSub.remove();
-      appStateSub.remove();
-    };
+  const [recent, setRecent] = useState<RecentRequest[]>([]);
+  const [showQuickInput, setShowQuickInput] = useState(false);
+  const [showCalendarSettings, setShowCalendarSettings] = useState(false);
+  const [showCreatedEvents, setShowCreatedEvents] = useState(false);
+  const [showReminders, setShowReminders] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [returnToQuickInput, setReturnToQuickInput] = useState(false);
+  const [showSimulateNotification, setShowSimulateNotification] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const refreshNotificationCount = useCallback(async () => {
+    try { setUnreadNotificationCount((await notificationProcessor.getRepository().listAll('new')).length); } catch { /* Inbox may still be initializing. */ }
   }, []);
 
-  const handleSelectSample = (sample: string) => {
-    setInputText(sample);
-    setErrorMessage(null);
-  };
+  useEffect(() => {
+    let cancelled = false;
+    let live: { remove: () => void } | undefined;
+    let appState: { remove: () => void } | undefined;
+    const drain = async () => { await drainAndProcessQueue(notificationProcessor); if (!cancelled) await refreshNotificationCount(); };
+    void (async () => {
+      try {
+        const settings = await loadNotificationSettings();
+        if (cancelled) return;
+        await syncSettingsToNative(settings.captureEnabled, settings.allowedApps);
+        if (cancelled) return;
+        live = subscribeToLiveNotifications(event => {
+          void notificationProcessor.processNotification(event).then(refreshNotificationCount).catch(console.warn);
+        });
+        appState = AppState.addEventListener('change', state => { if (state === 'active') void drain().catch(console.warn); });
+        await drain();
+      } catch (error) { console.warn('[Notifications] Initialization failed', error); }
+    })();
+    return () => { cancelled = true; live?.remove(); appState?.remove(); };
+  }, [refreshNotificationCount]);
 
-  const handleClear = () => {
-    setInputText('');
-    setErrorMessage(null);
-    setAnalysisResult(null);
-    setActionPlan(null);
-  };
-
-  const handleAnalyze = async () => {
-    const trimmed = inputText.trim();
-    if (!trimmed) {
-      setErrorMessage('Please enter a request to analyze.');
-      return;
-    }
-
-    setIsLoading(true);
-    setErrorMessage(null);
-
+  const navigate = (tab: TabKey) => { router.navigate(paths[tab]); void refreshNotificationCount(); };
+  const openInput = (suggestion?: string) => { if (suggestion) setInputText(suggestion); setShowQuickInput(true); };
+  const clear = () => { setInputText(''); setErrorMessage(null); setAnalysisResult(null); setActionPlan(null); };
+  const analyze = async (text: string, metadata?: { language: VoiceLanguage; recognition_confidence?: number }) => {
+    if (isLoading) return;
+    if (!text.trim()) { setErrorMessage('Enter a request to analyze.'); return; }
+    setIsLoading(true); setErrorMessage(null);
     try {
-      // 1. Create normalized InputEvent for text
-      const inputEvent = createTextInputEvent(trimmed);
-
-      // 2. Stage 1: Local Intent Understanding (100% deterministic & offline)
-      const idResult = await defaultIntentService.identify(inputEvent);
-      setAnalysisResult(idResult);
-
-      // 3. Stage 2: Supervisor Orchestration & ActionPlan Generation
-      const plan = supervisor.plan(idResult.analysis);
-      setActionPlan(plan);
-    } catch (err: unknown) {
-      const msg = (err as Error).message || 'Failed to process request';
-      setErrorMessage(msg);
-    } finally {
-      setIsLoading(false);
-    }
+      const input = metadata ? createVoiceInputEvent({ rawTranscript: text.trim(), language: metadata.language, confidence: metadata.recognition_confidence }) : createTextInputEvent(text.trim());
+      const result = await defaultIntentService.identify(input);
+      const plan = supervisor.plan(result.analysis);
+      setAnalysisResult(result); setActionPlan(plan);
+      setRecent(previous => [{ text: text.trim(), analysis: result, plan }, ...previous.filter(item => item.text !== text.trim())].slice(0, 5));
+    } catch (error) { setErrorMessage(error instanceof Error ? error.message : 'Could not analyze this request.'); }
+    finally { setIsLoading(false); }
   };
-
-  const handleVoiceSend = async (
-    transcript: string,
-    metadata: { language: VoiceLanguage; recognition_confidence?: number }
-  ) => {
-    const trimmed = transcript.trim();
-    if (!trimmed) return;
-
-    setInputText(trimmed);
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      // 1. Create normalized InputEvent for voice
-      const inputEvent = createVoiceInputEvent({
-        rawTranscript: trimmed,
-        language: metadata.language,
-        confidence: metadata.recognition_confidence,
-      });
-
-      // 2. Stage 1: Local Intent Understanding
-      const idResult = await defaultIntentService.identify(inputEvent);
-      setAnalysisResult(idResult);
-
-      // 3. Stage 2: Supervisor Orchestration & ActionPlan Generation
-      const plan = supervisor.plan(idResult.analysis);
-      setActionPlan(plan);
-    } catch (err: unknown) {
-      const msg = (err as Error).message || 'Failed to process voice request';
-      setErrorMessage(msg);
-    } finally {
-      setIsLoading(false);
-    }
+  const speak = () => { setReturnToQuickInput(showQuickInput); setShowQuickInput(false); setShowVoiceModal(true); };
+  const screens: AppScreens = {
+    home: {
+      inputText, setInputText, isLoading, errorMessage, setErrorMessage,
+      onAnalyze: () => { void analyze(inputText); }, onClear: clear, onOpenVoiceModal: speak,
+      onOpenInbox: () => navigate('inbox'), onOpenSimulateNotification: () => setShowSimulateNotification(true),
+      onOpenNotificationSettings: () => navigate('settings'), onOpenCalendarSettings: () => setShowCalendarSettings(true),
+      onOpenCreatedEvents: () => setShowCreatedEvents(true), onOpenReminders: () => setShowReminders(true),
+      unreadNotificationCount, analysisResult, actionPlan, calendarAgent, notificationProcessor, refreshNotificationCount,
+      recentRequests: recent, onSelectRecent: request => { setInputText(request.text); setAnalysisResult(request.analysis); setActionPlan(request.plan); },
+    },
+    inbox: { processor: notificationProcessor, onOpenSimulate: () => setShowSimulateNotification(true), onOpenSettings: () => navigate('settings') },
+    activity: { processor: notificationProcessor, calendarAgent, onNavigateToInput: openInput, onOpenInbox: () => navigate('inbox') },
+    settings: { processor: notificationProcessor, onClearAllData: async () => { await notificationProcessor.getRepository().clearAll(); await refreshNotificationCount(); } },
   };
-
-  return (
-    <View style={{ flex: 1 }}>
-      {activeTab === 'home' ? (
-        <HomeScreen
-          inputText={inputText}
-          setInputText={setInputText}
-          isLoading={isLoading}
-          errorMessage={errorMessage}
-          setErrorMessage={setErrorMessage}
-          onAnalyze={handleAnalyze}
-          onClear={handleClear}
-          onOpenVoiceModal={() => setShowVoiceModal(true)}
-          onOpenInbox={() => {
-            setActiveTab('inbox');
-            refreshNotificationCount();
-          }}
-          onOpenSimulateNotification={() => setShowSimulateNotification(true)}
-          onOpenNotificationSettings={() => setActiveTab('settings')}
-          onOpenCalendarSettings={() => setShowCalendarSettings(true)}
-          onOpenCreatedEvents={() => setShowCreatedEvents(true)}
-          onOpenReminders={() => setShowReminders(true)}
-          unreadNotificationCount={unreadNotificationCount}
-          analysisResult={analysisResult}
-          actionPlan={actionPlan}
-          calendarAgent={calendarAgent}
-          notificationProcessor={notificationProcessor}
-          refreshNotificationCount={refreshNotificationCount}
-        />
-      ) : activeTab === 'input' ? (
-        <InputScreen
-          inputText={inputText}
-          setInputText={setInputText}
-          isLoading={isLoading}
-          errorMessage={errorMessage}
-          setErrorMessage={setErrorMessage}
-          onAnalyze={handleAnalyze}
-          onClear={handleClear}
-          onOpenVoiceModal={() => setShowVoiceModal(true)}
-          onOpenInbox={() => {
-            setActiveTab('inbox');
-            refreshNotificationCount();
-          }}
-          analysisResult={analysisResult}
-          actionPlan={actionPlan}
-          calendarAgent={calendarAgent}
-        />
-      ) : activeTab === 'inbox' ? (
-        <InboxScreen
-          processor={notificationProcessor}
-          onOpenSimulate={() => setShowSimulateNotification(true)}
-          onOpenSettings={() => setActiveTab('settings')}
-        />
-      ) : activeTab === 'activity' ? (
-        <ActivityHistoryScreen
-          processor={notificationProcessor}
-          calendarAgent={calendarAgent}
-          onNavigateToInput={(suggestion) => {
-            if (suggestion) setInputText(suggestion);
-            setActiveTab('input');
-          }}
-          onOpenInbox={() => {
-            setActiveTab('inbox');
-            refreshNotificationCount();
-          }}
-        />
-      ) : activeTab === 'settings' ? (
-        <SettingsScreen
-          processor={notificationProcessor}
-          onClearAllData={async () => {
-            await notificationProcessor.getRepository().clearAll();
-            refreshNotificationCount();
-          }}
-        />
-      ) : null}
-
-      {/* Persistent Bottom Navigation Bar */}
-      <BottomNavBar
-        activeTab={activeTab}
-        onSelectTab={(tab) => {
-          setActiveTab(tab);
-          if (tab === 'inbox' || tab === 'home') {
-            refreshNotificationCount();
-          }
-        }}
-        unreadInboxCount={unreadNotificationCount}
-      />
-
-      {/* Voice Recognition Modal */}
-      <VoiceInputModal
-        visible={showVoiceModal}
-        onClose={() => setShowVoiceModal(false)}
-        onSendTranscript={handleVoiceSend}
-      />
-
-      {/* Notification Modals */}
-      <SimulatedNotificationModal
-        visible={showSimulateNotification}
-        onClose={() => setShowSimulateNotification(false)}
-        onOpenInbox={() => {
-          setActiveTab('inbox');
-          refreshNotificationCount();
-        }}
-        processor={notificationProcessor}
-        onNotificationProcessed={refreshNotificationCount}
-      />
-
-      <NotificationInboxModal
-        visible={showNotificationInbox}
-        onClose={() => {
-          setShowNotificationInbox(false);
-          refreshNotificationCount();
-        }}
-        processor={notificationProcessor}
-      />
-
-      <NotificationSettingsModal
-        visible={showNotificationSettings}
-        onClose={() => setShowNotificationSettings(false)}
-        onClearAllNotifications={async () => {
-          await notificationProcessor.getRepository().clearAll();
-          refreshNotificationCount();
-        }}
-      />
-
-      {/* Calendar Settings Modal */}
-      <CalendarSettingsModal
-        visible={showCalendarSettings}
-        onClose={() => setShowCalendarSettings(false)}
-      />
-
-      {/* Created Events & Management Modal */}
-      <CreatedEventsModal
-        visible={showCreatedEvents}
-        onClose={() => setShowCreatedEvents(false)}
-        calendarAgent={calendarAgent}
-      />
-
-      {/* Reminders Modal */}
-      <RemindersModal
-        visible={showReminders}
-        onClose={() => setShowReminders(false)}
-        calendarAgent={calendarAgent}
-        processor={notificationProcessor}
-        onNavigateToInput={(suggestion) => {
-          setShowReminders(false);
-          if (suggestion) setInputText(suggestion);
-          setActiveTab('input');
-        }}
-      />
+  return <AppScreenContext.Provider value={screens}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <Entrance key={pathname} style={{ flex: 1 }}><Slot /></Entrance>
+      <BottomNavBar activeTab={activeTab} onSelectTab={navigate} onOpenQuickInput={() => openInput()} unreadInboxCount={unreadNotificationCount} />
+      <QuickInputSheet visible={showQuickInput} onClose={() => setShowQuickInput(false)} text={inputText} onChangeText={text => { setInputText(text); setErrorMessage(null); }}
+        onAnalyze={() => { void analyze(inputText); }} onSpeak={speak} loading={isLoading} error={errorMessage} analysis={analysisResult} plan={actionPlan} calendarAgent={calendarAgent}
+        recent={recent} onSelectRecent={screens.home.onSelectRecent!} />
+      <VoiceInputModal visible={showVoiceModal} onClose={() => { setShowVoiceModal(false); if (returnToQuickInput) setShowQuickInput(true); }}
+        onSendTranscript={(text, metadata) => { setInputText(text); void analyze(text, metadata); }} />
+      <SimulatedNotificationModal visible={showSimulateNotification} onClose={() => setShowSimulateNotification(false)} processor={notificationProcessor}
+        onOpenInbox={() => { setShowSimulateNotification(false); navigate('inbox'); }} onNotificationProcessed={refreshNotificationCount} />
+      <CalendarSettingsModal visible={showCalendarSettings} onClose={() => setShowCalendarSettings(false)} />
+      <CreatedEventsModal visible={showCreatedEvents} onClose={() => setShowCreatedEvents(false)} calendarAgent={calendarAgent} />
+      <RemindersModal visible={showReminders} onClose={() => setShowReminders(false)} calendarAgent={calendarAgent} processor={notificationProcessor}
+        onNavigateToInput={suggestion => { setShowReminders(false); openInput(suggestion); }} />
     </View>
-  );
+  </AppScreenContext.Provider>;
 };

@@ -11,4 +11,6 @@ export * from './ErrorState';
 export * from './ConfirmationDialog';
 export * from './BottomSheet';
 export * from './BottomNavBar';
+export * from './Icon';
+export * from './IconTile';
 

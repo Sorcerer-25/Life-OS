@@ -58,17 +58,24 @@ function modifyMainApplication(config) {
     // 1. Add import if not present
     if (!content.includes('import lifeos.notificationlistener.LifeOSNotificationListenerPackage')) {
       content = content.replace(
-        /import com\.facebook\.react\.PackageList/,
-        `import com.facebook.react.PackageList\nimport lifeos.notificationlistener.LifeOSNotificationListenerPackage`
+        /(package\s+[\w\.]+)/,
+        `$1\n\nimport lifeos.notificationlistener.LifeOSNotificationListenerPackage`
       );
     }
 
-    // 2. Add package to packageList.apply { ... }
-    if (!content.includes('add(LifeOSNotificationListenerPackage())')) {
-      content = content.replace(
-        /PackageList\(this\)\.packages\.apply\s*\{/,
-        `PackageList(this).packages.apply {\n          add(LifeOSNotificationListenerPackage())`
-      );
+    // 2. Add package to packageList
+    if (!content.includes('LifeOSNotificationListenerPackage()')) {
+      if (content.includes('PackageList(this).packages.apply {')) {
+        content = content.replace(
+          'PackageList(this).packages.apply {',
+          'PackageList(this).packages.toMutableList().apply {\n          add(LifeOSNotificationListenerPackage())'
+        );
+      } else if (content.includes('PackageList(this).packages')) {
+        content = content.replace(
+          'PackageList(this).packages',
+          '(PackageList(this).packages.toMutableList().apply { add(LifeOSNotificationListenerPackage()) })'
+        );
+      }
     }
 
     config.modResults.contents = content;

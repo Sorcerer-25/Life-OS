@@ -2,12 +2,12 @@ import React from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   View,
   ViewStyle,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../../theme';
 
@@ -41,7 +41,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
       style={styles.scroll}
       contentContainerStyle={[
         styles.scrollContent,
-        { padding: theme.spacing.lg },
+        { padding: theme.spacing.lg, paddingBottom: 104 },
         contentContainerStyle,
       ]}
       keyboardShouldPersistTaps="handled"
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 80,
+    paddingBottom: 112,
   },
 });
 

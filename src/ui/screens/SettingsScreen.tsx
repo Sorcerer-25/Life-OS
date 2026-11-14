@@ -1,55 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Alert,
-  LayoutAnimation,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  UIManager,
-  View,
-} from 'react-native';
+import { ScalePressable, animateLayout } from '../components/core/Motion';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Alert, LayoutAnimation, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, UIManager, View } from 'react-native';
 import { CalendarAdapter } from '../../calendar/calendarAdapter';
-import {
-  formatCalendarSourceDescription,
-  getCalendarPreferences,
-  listWritableCalendars,
-  setSelectedCalendarId,
-} from '../../calendar/calendarSettings';
+import { formatCalendarSourceDescription, getCalendarPreferences, listWritableCalendars, setSelectedCalendarId } from '../../calendar/calendarSettings';
 import { ExpoCalendarAdapter } from '../../calendar/expoCalendarAdapter';
-import {
-  CalendarInfo,
-  CalendarPermissionResponse,
-  CalendarPreferences,
-} from '../../calendar/types';
-import {
-  getNativeListenerStatus,
-  NativeListenerStatus,
-  openNotificationListenerSettings,
-  requestRebindListener,
-  syncSettingsToNative,
-} from '../../notifications/nativeNotificationListener';
+import { CalendarInfo, CalendarPermissionResponse, CalendarPreferences } from '../../calendar/types';
+import { getNativeListenerStatus, NativeListenerStatus, openNotificationListenerSettings, requestRebindListener, syncSettingsToNative } from '../../notifications/nativeNotificationListener';
 import { NotificationProcessor } from '../../notifications/notificationProcessor';
-import {
-  addAppToAllowList,
-  getNotificationSettings,
-  isAppAllowed,
-  KNOWN_APPS,
-  NotificationSettings,
-  removeAppFromAllowList,
-  updateNotificationSettings,
-} from '../../notifications/notificationSettings';
+import { addAppToAllowList, getNotificationSettings, isAppAllowed, KNOWN_APPS, loadNotificationSettings, NotificationSettings, removeAppFromAllowList, updateNotificationSettings } from '../../notifications/notificationSettings';
 import { ThemeMode, useTheme } from '../theme';
 import { VoiceLanguage, VoiceService } from '../../voice/voiceService';
 import { BottomSheet } from '../components/core/BottomSheet';
 import { ConfirmationDialog } from '../components/core/ConfirmationDialog';
-import { PrimaryButton } from '../components/core/PrimaryButton';
+import { Icon, IconName } from '../components/core/Icon';
+import { IconTile } from '../components/core/IconTile';
+
 import { ScreenContainer } from '../components/core/ScreenContainer';
 import { SecondaryButton } from '../components/core/SecondaryButton';
-import { SectionHeader } from '../components/core/SectionHeader';
 import { StatusBadge } from '../components/core/StatusBadge';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -74,7 +41,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onClose,
   isModal = false,
 }) => {
-  const { theme, mode, setMode, toggleTheme } = useTheme();
+  const { theme, mode, setMode } = useTheme();
 
   // 1. Notification Settings & Listener State
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>(getNotificationSettings());
@@ -102,9 +69,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
   const [isClearingData, setIsClearingData] = useState<boolean>(false);
 
-  const loadAllSettings = async () => {
+  const loadAllSettings = useCallback(async () => {
     // Notification state
-    const currentNotif = getNotificationSettings();
+    const currentNotif = await loadNotificationSettings();
     setNotifSettings(currentNotif);
     try {
       const status = await getNativeListenerStatus();
@@ -135,11 +102,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     } catch {
       setVoicePermission('unknown');
     }
-  };
+  }, [adapter]);
 
   useEffect(() => {
-    loadAllSettings();
-  }, []);
+    let cancelled = false;
+    void Promise.resolve().then(() => { if (!cancelled) return loadAllSettings(); });
+    return () => { cancelled = true; };
+  }, [loadAllSettings]);
 
   // --- Notification Handlers ---
   const handleToggleCapture = async (val: boolean) => {
@@ -274,6 +243,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     }
   };
 
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    notifications: true,
+    appearance: false,
+    voice: false,
+    calendar: false,
+    privacy: false,
+    data: false,
+    about: false,
+  });
+
+  const toggleSection = (key: string) => {
+    animateLayout();
+    setExpandedSections((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
   const currentCalendarName = (() => {
     if (!calPreferences?.selectedCalendarId) {
       const primary = writableCalendars.find((c) => c.isPrimary);
@@ -282,6 +269,55 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     const found = writableCalendars.find((c) => c.id === calPreferences.selectedCalendarId);
     return found ? `${found.title} (${found.accountName})` : `Calendar #${calPreferences.selectedCalendarId}`;
   })();
+
+  const renderAccordionHeader = (
+    key: string,
+    title: string,
+    subtitle: string,
+    iconName: IconName,
+    iconColor: string
+  ) => {
+    const isExpanded = !!expandedSections[key];
+    return (
+      <ScalePressable style={[
+          styles.accordionHeader,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+            borderBottomWidth: isExpanded ? 0 : 1,
+            borderTopLeftRadius: theme.radii.md,
+            borderTopRightRadius: theme.radii.md,
+            borderBottomLeftRadius: isExpanded ? 0 : theme.radii.md,
+            borderBottomRightRadius: isExpanded ? 0 : theme.radii.md,
+          },
+        ]}
+        onPress={() => toggleSection(key)}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`Toggle ${title}`}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+          <IconTile name={iconName} color={iconColor} size={36} iconSize={18} />
+          <View style={{ flex: 1 }}>
+            <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
+              {title}
+            </Text>
+            <Text
+              style={[theme.typography.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}
+              numberOfLines={1}
+            >
+              {subtitle}
+            </Text>
+          </View>
+        </View>
+        <Icon
+          name={isExpanded ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={theme.colors.textSecondary}
+        />
+      </ScalePressable>
+    );
+  };
 
   return (
     <ScreenContainer testID="settings-screen">
@@ -295,601 +331,669 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             System configuration, privacy boundaries & integrations
           </Text>
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={[styles.headerActionBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-            onPress={toggleTheme}
+        {isModal && onClose && (
+          <ScalePressable style={[styles.headerActionBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+            onPress={onClose}
             activeOpacity={0.7}
-            accessibilityLabel="Toggle Theme"
+            accessibilityLabel="Close"
           >
-            <Text style={styles.headerActionIcon}>{theme.isDark ? '☀️' : '🌙'}</Text>
-          </TouchableOpacity>
-          {isModal && onClose && (
-            <TouchableOpacity
-              style={[styles.headerActionBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-              onPress={onClose}
-              activeOpacity={0.7}
-              accessibilityLabel="Close"
-            >
-              <Text style={styles.headerActionIcon}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+            <Icon name="x" size={18} color={theme.colors.textSecondary} />
+          </ScalePressable>
+        )}
       </View>
 
       <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* ========================================================
-            1. APPEARANCE
+            1. NOTIFICATION INTELLIGENCE & CAPTURE
         ======================================================== */}
-        <View style={styles.section}>
-          <SectionHeader title="Appearance" />
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: theme.radii.md },
-              theme.shadows.sm,
-            ]}
-          >
-            <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
-              Theme Mode
-            </Text>
-            <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
-              Choose your preferred visual theme. Persisted locally in SQLite.
-            </Text>
-
-            <View style={styles.themeSelectorRow}>
-              {(
-                [
-                  { mode: 'system' as ThemeMode, label: 'System Default', icon: '📱' },
-                  { mode: 'light' as ThemeMode, label: 'Light', icon: '☀️' },
-                  { mode: 'dark' as ThemeMode, label: 'Dark', icon: '🌙' },
-                ] as const
-              ).map((item) => {
-                const isSelected = mode === item.mode;
-                return (
-                  <TouchableOpacity
-                    key={item.mode}
-                    style={[
-                      styles.themeOptionBtn,
-                      {
-                        backgroundColor: isSelected ? theme.colors.primaryLight : theme.colors.surface,
-                        borderColor: isSelected ? theme.colors.primaryLight : theme.colors.border,
-                        borderRadius: theme.radii.sm,
-                      },
-                    ]}
-                    onPress={() => setMode(item.mode)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.themeOptionIcon}>{item.icon}</Text>
-                    <Text
-                      style={[
-                        styles.themeOptionLabel,
-                        {
-                          color: isSelected ? theme.colors.primaryDark : theme.colors.textPrimary,
-                          fontWeight: isSelected ? '700' : '500',
-                        },
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-
-        {/* ========================================================
-            2. VOICE & SPEECH INPUT
-        ======================================================== */}
-        <View style={styles.section}>
-          <SectionHeader title="Voice Recognition" />
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: theme.radii.md },
-              theme.shadows.sm,
-            ]}
-          >
-            <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
-              Voice Recognition Language
-            </Text>
-            <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
-              Configured speech model locale for transcription accuracy.
-            </Text>
-
-            <View style={styles.voiceLangRow}>
-              {(
-                [
-                  { code: 'en-IN' as VoiceLanguage, label: 'English (India - en-IN)', flag: '🇮🇳' },
-                  { code: 'en-US' as VoiceLanguage, label: 'English (US - en-US)', flag: '🇺🇸' },
-                ] as const
-              ).map((lang) => {
-                const isSelected = selectedVoiceLanguage === lang.code;
-                return (
-                  <TouchableOpacity
-                    key={lang.code}
-                    style={[
-                      styles.voiceLangBtn,
-                      {
-                        backgroundColor: isSelected ? theme.colors.primaryLight : theme.colors.surface,
-                        borderColor: isSelected ? theme.colors.primaryLight : theme.colors.border,
-                        borderRadius: theme.radii.sm,
-                      },
-                    ]}
-                    onPress={() => setSelectedVoiceLanguage(lang.code)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={{ fontSize: 16 }}>{lang.flag}</Text>
-                    <Text
-                      style={[
-                        styles.voiceLangLabel,
-                        {
-                          color: isSelected ? theme.colors.primaryDark : theme.colors.textPrimary,
-                          fontWeight: isSelected ? '700' : '500',
-                        },
-                      ]}
-                    >
-                      {lang.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Voice Module Diagnostic Status */}
+        <View style={styles.sectionContainer}>
+          {renderAccordionHeader(
+            'notifications',
+            'Notifications',
+            `${notifSettings.allowedApps.length} apps allowed · ${notifSettings.captureEnabled ? 'Active' : 'Paused'}`,
+            'inbox',
+            theme.colors.agentInbox
+          )}
+          {expandedSections['notifications'] && (
             <View
               style={[
-                styles.diagnosticBox,
-                { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderSubtle, borderRadius: theme.radii.sm },
+                styles.accordionBody,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderBottomLeftRadius: theme.radii.md,
+                  borderBottomRightRadius: theme.radii.md,
+                },
               ]}
             >
-              <View style={styles.diagnosticRow}>
-                <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
-                  Speech Recognition Engine:
-                </Text>
-                <StatusBadge
-                  status={isVoiceModuleAvailable ? 'active' : 'info'}
-                  label={isVoiceModuleAvailable ? 'Native Linked' : 'Expo Go (Simulation)'}
-                  size="sm"
-                />
-              </View>
-
-              <View style={[styles.diagnosticRow, { marginTop: 6 }]}>
-                <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
-                  Microphone Permission:
-                </Text>
-                <StatusBadge
-                  status={voicePermission === 'granted' ? 'active' : 'warning'}
-                  label={voicePermission === 'granted' ? 'Granted' : 'Not Granted'}
-                  size="sm"
-                />
-              </View>
-
-              {voicePermission !== 'granted' && (
-                <TouchableOpacity style={{ marginTop: 8 }} onPress={handleRequestVoicePermission}>
-                  <Text style={[theme.typography.caption, { color: theme.colors.primaryLight, fontWeight: '700' }]}>
-                    Request Microphone Permission →
+              {/* Master Capture Switch */}
+              <View style={styles.switchRow}>
+                <View style={styles.switchTextContainer}>
+                  <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
+                    Real Notification Capture
                   </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* ========================================================
-            3. NOTIFICATION INTELLIGENCE & CAPTURE
-        ======================================================== */}
-        <View style={styles.section}>
-          <SectionHeader title="Notification Intelligence" />
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: theme.radii.md },
-              theme.shadows.sm,
-            ]}
-          >
-            {/* Master Capture Switch */}
-            <View style={styles.switchRow}>
-              <View style={styles.switchTextContainer}>
-                <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
-                  Real Notification Capture
-                </Text>
-                <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
-                  Capture incoming alerts from allow-listed apps into the offline inbox (Default: OFF).
-                </Text>
-              </View>
-              <Switch
-                value={notifSettings.captureEnabled}
-                onValueChange={handleToggleCapture}
-                trackColor={{ false: theme.colors.border, true: theme.colors.primaryLight }}
-                thumbColor={notifSettings.captureEnabled ? theme.colors.primaryDark : theme.colors.textTertiary}
-              />
-            </View>
-
-            {/* Listener Service Status Box */}
-            <View
-              style={[
-                styles.diagnosticBox,
-                { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderSubtle, borderRadius: theme.radii.sm },
-              ]}
-            >
-              <View style={styles.diagnosticRow}>
-                <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
-                  Android Access Permission:
-                </Text>
-                <StatusBadge
-                  status={nativeStatus.isPermissionGranted ? 'active' : 'warning'}
-                  label={nativeStatus.isPermissionGranted ? 'Granted' : 'Not Granted'}
-                  size="sm"
+                  <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
+                    Capture incoming alerts from allow-listed apps into the offline inbox.
+                  </Text>
+                </View>
+                <Switch
+                  value={notifSettings.captureEnabled}
+                  onValueChange={handleToggleCapture}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.info }}
+                  thumbColor={notifSettings.captureEnabled ? theme.colors.primaryForeground : theme.colors.textTertiary}
                 />
               </View>
 
-              <View style={[styles.diagnosticRow, { marginTop: 6 }]}>
-                <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
-                  NotificationListenerService:
-                </Text>
-                <StatusBadge
-                  status={nativeStatus.isConnected ? 'active' : 'secondary'}
-                  label={nativeStatus.isConnected ? 'Connected' : 'Disconnected'}
-                  size="sm"
-                />
-              </View>
-
-              <View style={[styles.actionButtonsRow, { marginTop: 10 }]}>
-                <TouchableOpacity
-                  style={[styles.smallActionBtn, { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border }]}
-                  onPress={openNotificationListenerSettings}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.smallActionBtnText, { color: theme.colors.textPrimary }]}>
-                    Open System Access
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.smallActionBtn, { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border }]}
-                  onPress={handleRebindListener}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.smallActionBtnText, { color: theme.colors.primaryLight }]}>
-                    Rebind Service
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Android 13+ Restricted Settings Help Banner */}
-            <TouchableOpacity
-              style={[
-                styles.restrictedToggle,
-                { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border, borderRadius: theme.radii.sm },
-              ]}
-              onPress={() => {
-                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                setShowRestrictedHelp(!showRestrictedHelp);
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={[theme.typography.caption, { color: theme.colors.warning, fontWeight: '700' }]}>
-                ⚠️ Android 13+ Restricted Settings Guidance {showRestrictedHelp ? '▲' : '▼'}
-              </Text>
-            </TouchableOpacity>
-
-            {showRestrictedHelp && (
+              {/* Listener Service Status Box */}
               <View
                 style={[
-                  styles.restrictedContent,
-                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderSubtle },
+                  styles.diagnosticBox,
+                  { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border, borderRadius: theme.radii.sm },
                 ]}
               >
-                <Text style={[theme.typography.caption, { color: theme.colors.textSecondary, lineHeight: 18 }]}>
-                  On Android 13+, sideloaded APKs have Notification Access greyed out by default.{'\n'}
-                  1. Open Android Settings → Apps → LifeOS.{'\n'}
-                  2. Tap the 3 dots in the top right corner.{'\n'}
-                  3. Tap <Text style={{ fontWeight: '700', color: theme.colors.textPrimary }}>Allow restricted settings</Text>.{'\n'}
-                  4. Return here and tap "Open System Access".
-                </Text>
-              </View>
-            )}
+                <View style={styles.diagnosticRow}>
+                  <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
+                    Android Access Permission:
+                  </Text>
+                  <StatusBadge
+                    status={nativeStatus.isPermissionGranted ? 'active' : 'warning'}
+                    label={nativeStatus.isPermissionGranted ? 'Granted' : 'Not Granted'}
+                    size="sm"
+                  />
+                </View>
 
-            {/* Offline-Only Parser Switch */}
-            <View style={[styles.switchRow, { marginTop: 14 }]}>
-              <View style={styles.switchTextContainer}>
+                <View style={[styles.diagnosticRow, { marginTop: 6 }]}>
+                  <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
+                    NotificationListenerService:
+                  </Text>
+                  <StatusBadge
+                    status={nativeStatus.isConnected ? 'active' : 'secondary'}
+                    label={nativeStatus.isConnected ? 'Connected' : 'Disconnected'}
+                    size="sm"
+                  />
+                </View>
+
+                <View style={[styles.actionButtonsRow, { marginTop: 10 }]}>
+                  <ScalePressable style={[styles.smallActionBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+                    onPress={openNotificationListenerSettings}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="external-link" size={18} color={theme.colors.textPrimary} />
+                    <Text style={[styles.smallActionBtnText, { color: theme.colors.textPrimary }]}>
+                      Open System Access
+                    </Text>
+                  </ScalePressable>
+
+                  <ScalePressable style={[styles.smallActionBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+                    onPress={handleRebindListener}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="refresh-cw" size={18} color={theme.colors.info} />
+                    <Text style={[styles.smallActionBtnText, { color: theme.colors.info }]}>
+                      Rebind Service
+                    </Text>
+                  </ScalePressable>
+                </View>
+              </View>
+
+              {/* Android 13+ Restricted Settings Help Banner */}
+              <ScalePressable style={[
+                  styles.restrictedToggle,
+                  { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border, borderRadius: theme.radii.sm },
+                ]}
+                onPress={() => {
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  setShowRestrictedHelp(!showRestrictedHelp);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Icon name="alert-triangle" size={18} color={theme.colors.warning} />
+                  <Text style={[theme.typography.caption, { color: theme.colors.warning, fontWeight: '700', flex: 1 }]}>
+                    Android 13+ Restricted Settings Guidance
+                  </Text>
+                  <Icon name={showRestrictedHelp ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.warning} />
+                </View>
+              </ScalePressable>
+
+              {showRestrictedHelp && (
+                <View
+                  style={[
+                    styles.restrictedContent,
+                    { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border },
+                  ]}
+                >
+                  <Text style={[theme.typography.caption, { color: theme.colors.textSecondary, lineHeight: 18 }]}>
+                    On Android 13+, sideloaded APKs have Notification Access greyed out by default.{'\n'}
+                    1. Open Android Settings → Apps → LifeOS.{'\n'}
+                    2. Tap the 3 dots in the top right corner.{'\n'}
+                    3. Tap <Text style={{ fontWeight: '700', color: theme.colors.textPrimary }}>Allow restricted settings</Text>.{'\n'}
+                    4. Return here and tap &quot;Open System Access&quot;.
+                  </Text>
+                </View>
+              )}
+
+              {/* Offline-Only Parser Switch */}
+              <View style={[styles.switchRow, { marginTop: 14 }]}>
+                <View style={styles.switchTextContainer}>
+                  <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
+                    Offline analysis
+                  </Text>
+                  <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
+                    Guarantees notification text is never transmitted outside your phone.
+                  </Text>
+                </View>
+                <Switch
+                  value={notifSettings.offlineParserOnly}
+                  onValueChange={handleToggleOfflineOnly}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.info }}
+                  thumbColor={notifSettings.offlineParserOnly ? theme.colors.primaryForeground : theme.colors.textTertiary}
+                />
+              </View>
+
+              {/* Retention Policy */}
+              <View style={{ marginTop: 14 }}>
                 <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
-                  Offline Parser Only
+                  Data Retention Period
                 </Text>
                 <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
-                  Guarantees notification text is never transmitted outside your phone.
+                  Automatically clean up notifications older than:
                 </Text>
+                <View style={styles.retentionRow}>
+                  {[3, 7, 14, 30].map((days) => {
+                    const isSelected = notifSettings.retentionDays === days;
+                    return (
+                      <ScalePressable key={days}
+                        style={[
+                          styles.retentionChip,
+                          {
+                            backgroundColor: isSelected ? theme.colors.info : theme.colors.surfaceSubtle,
+                            borderColor: isSelected ? theme.colors.info : theme.colors.border,
+                            borderRadius: theme.radii.pill,
+                          },
+                        ]}
+                        onPress={() => handleSelectRetention(days)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.retentionChipText,
+                            {
+                              color: isSelected ? theme.colors.primaryForeground : theme.colors.textPrimary,
+                              fontWeight: isSelected ? '700' : '500',
+                            },
+                          ]}
+                        >
+                          {days} Days
+                        </Text>
+                      </ScalePressable>
+                    );
+                  })}
+                </View>
               </View>
-              <Switch
-                value={notifSettings.offlineParserOnly}
-                onValueChange={handleToggleOfflineOnly}
-                trackColor={{ false: theme.colors.border, true: theme.colors.primaryLight }}
-                thumbColor={notifSettings.offlineParserOnly ? theme.colors.primaryDark : theme.colors.textTertiary}
-              />
-            </View>
 
-            {/* Retention Policy */}
-            <View style={{ marginTop: 14 }}>
+              {/* Allowed Apps Management */}
+              <View style={{ marginTop: 16 }}>
+                <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
+                  Allowed Apps ({notifSettings.allowedApps.length} active)
+                </Text>
+                <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
+                  Only notifications from enabled apps will be captured.
+                </Text>
+
+                <View style={styles.knownAppsList}>
+                  {KNOWN_APPS.map((app) => {
+                    const allowed = isAppAllowed(app.packageName);
+                    return (
+                      <ScalePressable key={app.packageName}
+                        style={[
+                          styles.knownAppItem,
+                          {
+                            backgroundColor: allowed ? theme.colors.surfaceSubtle : theme.colors.surface,
+                            borderColor: theme.colors.border,
+                            borderRadius: theme.radii.sm,
+                          },
+                        ]}
+                        onPress={() => handleToggleApp(app.packageName)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
+                            {app.label}
+                          </Text>
+                          <Text style={[theme.typography.caption, { color: theme.colors.textTertiary }]}>
+                            {app.packageName}
+                          </Text>
+                        </View>
+                        <Switch
+                          value={allowed}
+                          onValueChange={() => handleToggleApp(app.packageName)}
+                          trackColor={{ false: theme.colors.border, true: theme.colors.info }}
+                          thumbColor={allowed ? theme.colors.primaryForeground : theme.colors.textTertiary}
+                        />
+                      </ScalePressable>
+                    );
+                  })}
+                </View>
+
+                {/* Add Custom App Package Input */}
+                <View style={styles.customAppRow}>
+                  <TextInput
+                    style={[
+                      styles.customAppInput,
+                      {
+                        backgroundColor: theme.colors.surfaceSubtle,
+                        borderColor: theme.colors.border,
+                        color: theme.colors.textPrimary,
+                        borderRadius: theme.radii.sm,
+                      },
+                    ]}
+                    placeholder="e.g. com.example.customapp"
+                    placeholderTextColor={theme.colors.textTertiary}
+                    value={customPackageInput}
+                    onChangeText={setCustomPackageInput}
+                    autoCapitalize="none"
+                  />
+                  <ScalePressable style={[
+                      styles.addAppBtn,
+                      { backgroundColor: theme.colors.info, borderRadius: theme.radii.sm },
+                    ]}
+                    onPress={handleAddCustomPackage}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="plus" size={18} color={theme.colors.primaryForeground} />
+                    <Text style={[styles.addAppBtnText, { color: theme.colors.primaryForeground, marginLeft: 4 }]}>
+                      Add
+                    </Text>
+                  </ScalePressable>
+                </View>
+
+                {/* Custom Allow List Badges */}
+                {notifSettings.allowedApps.length > 0 && (
+                  <View style={styles.allowedBadgesWrap}>
+                    {notifSettings.allowedApps.map((pkg) => (
+                      <View
+                        key={pkg}
+                        style={[
+                          styles.allowedChip,
+                          { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border },
+                        ]}
+                      >
+                        <Text style={[styles.allowedChipText, { color: theme.colors.textPrimary }]}>
+                          {pkg}
+                        </Text>
+                        <ScalePressable onPress={() => handleRemoveCustomPackage(pkg)}>
+                          <Icon name="x" size={18} color={theme.colors.error} />
+                        </ScalePressable>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* ========================================================
+            2. APPEARANCE
+        ======================================================== */}
+        <View style={styles.sectionContainer}>
+          {renderAccordionHeader(
+            'appearance',
+            'Appearance',
+            `Theme: ${mode.charAt(0).toUpperCase() + mode.slice(1)}`,
+            'sun',
+            theme.colors.info
+          )}
+          {expandedSections['appearance'] && (
+            <View
+              style={[
+                styles.accordionBody,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderBottomLeftRadius: theme.radii.md,
+                  borderBottomRightRadius: theme.radii.md,
+                },
+              ]}
+            >
               <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
-                Data Retention Period
+                Theme Mode
               </Text>
               <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
-                Automatically clean up notifications older than:
+                Choose your preferred visual theme. Persisted locally in SQLite.
               </Text>
-              <View style={styles.retentionRow}>
-                {[3, 7, 14, 30].map((days) => {
-                  const isSelected = notifSettings.retentionDays === days;
+
+              <View style={styles.themeSelectorRow}>
+                {(
+                  [
+                    { mode: 'system' as ThemeMode, label: 'System Default', iconName: 'smartphone' as const },
+                    { mode: 'light' as ThemeMode, label: 'Light', iconName: 'sun' as const },
+                    { mode: 'dark' as ThemeMode, label: 'Dark', iconName: 'moon' as const },
+                  ] as const
+                ).map((item) => {
+                  const isSelected = mode === item.mode;
                   return (
-                    <TouchableOpacity
-                      key={days}
+                    <ScalePressable key={item.mode}
                       style={[
-                        styles.retentionChip,
+                        styles.themeOptionBtn,
                         {
-                          backgroundColor: isSelected ? theme.colors.primaryLight : theme.colors.surface,
-                          borderColor: isSelected ? theme.colors.primaryLight : theme.colors.border,
-                          borderRadius: theme.radii.pill,
+                          backgroundColor: isSelected ? theme.colors.surfaceSubtle : theme.colors.surface,
+                          borderColor: isSelected ? theme.colors.info : theme.colors.border,
+                          borderRadius: theme.radii.sm,
                         },
                       ]}
-                      onPress={() => handleSelectRetention(days)}
+                      onPress={() => setMode(item.mode)}
                       activeOpacity={0.7}
                     >
+                      <Icon
+                        name={item.iconName}
+                        size={18}
+                        color={isSelected ? theme.colors.info : theme.colors.textSecondary}
+                      />
                       <Text
                         style={[
-                          styles.retentionChipText,
+                          styles.themeOptionLabel,
                           {
-                            color: isSelected ? theme.colors.primaryDark : theme.colors.textPrimary,
+                            color: isSelected ? theme.colors.textPrimary : theme.colors.textSecondary,
+                            fontWeight: isSelected ? '700' : '500',
+                            marginTop: 6,
+                          },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </ScalePressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* ========================================================
+            3. VOICE & SPEECH INPUT
+        ======================================================== */}
+        <View style={styles.sectionContainer}>
+          {renderAccordionHeader(
+            'voice',
+            'Voice Recognition',
+            `Locale: ${selectedVoiceLanguage} · ${isVoiceModuleAvailable ? 'Native Linked' : 'Simulated'}`,
+            'mic',
+            theme.colors.agentReminder
+          )}
+          {expandedSections['voice'] && (
+            <View
+              style={[
+                styles.accordionBody,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderBottomLeftRadius: theme.radii.md,
+                  borderBottomRightRadius: theme.radii.md,
+                },
+              ]}
+            >
+              <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
+                Voice Recognition Language
+              </Text>
+              <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
+                Configured speech model locale for transcription accuracy.
+              </Text>
+
+              <View style={styles.voiceLangRow}>
+                {(
+                  [
+                    { code: 'en-IN' as VoiceLanguage, label: 'English (India)' },
+                    { code: 'en-US' as VoiceLanguage, label: 'English (US)' },
+                  ] as const
+                ).map((lang) => {
+                  const isSelected = selectedVoiceLanguage === lang.code;
+                  return (
+                    <ScalePressable key={lang.code}
+                      style={[
+                        styles.voiceLangBtn,
+                        {
+                          backgroundColor: isSelected ? theme.colors.surfaceSubtle : theme.colors.surface,
+                          borderColor: isSelected ? theme.colors.info : theme.colors.border,
+                          borderRadius: theme.radii.sm,
+                        },
+                      ]}
+                      onPress={() => setSelectedVoiceLanguage(lang.code)}
+                      activeOpacity={0.7}
+                    >
+                      <Icon
+                        name="globe"
+                        size={18}
+                        color={isSelected ? theme.colors.info : theme.colors.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.voiceLangLabel,
+                          {
+                            color: isSelected ? theme.colors.textPrimary : theme.colors.textSecondary,
                             fontWeight: isSelected ? '700' : '500',
                           },
                         ]}
                       >
-                        {days} Days
+                        {lang.label}
                       </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Allowed Apps Management */}
-            <View style={{ marginTop: 16 }}>
-              <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
-                Allowed Apps ({notifSettings.allowedApps.length} active)
-              </Text>
-              <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
-                Only notifications from enabled apps will be captured.
-              </Text>
-
-              <View style={styles.knownAppsList}>
-                {KNOWN_APPS.map((app) => {
-                  const allowed = isAppAllowed(app.packageName);
-                  return (
-                    <TouchableOpacity
-                      key={app.packageName}
-                      style={[
-                        styles.knownAppItem,
-                        {
-                          backgroundColor: allowed ? theme.colors.surfaceSubtle : theme.colors.surface,
-                          borderColor: theme.colors.borderSubtle,
-                          borderRadius: theme.radii.sm,
-                        },
-                      ]}
-                      onPress={() => handleToggleApp(app.packageName)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
-                          {app.label}
-                        </Text>
-                        <Text style={[theme.typography.caption, { color: theme.colors.textTertiary }]}>
-                          {app.packageName}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={allowed}
-                        onValueChange={() => handleToggleApp(app.packageName)}
-                        trackColor={{ false: theme.colors.border, true: theme.colors.primaryLight }}
-                        thumbColor={allowed ? theme.colors.primaryDark : theme.colors.textTertiary}
-                      />
-                    </TouchableOpacity>
+                    </ScalePressable>
                   );
                 })}
               </View>
 
-              {/* Add Custom App Package Input */}
-              <View style={styles.customAppRow}>
-                <TextInput
-                  style={[
-                    styles.customAppInput,
-                    {
-                      backgroundColor: theme.colors.surface,
-                      borderColor: theme.colors.border,
-                      color: theme.colors.textPrimary,
-                      borderRadius: theme.radii.sm,
-                    },
-                  ]}
-                  placeholder="e.g. com.example.customapp"
-                  placeholderTextColor={theme.colors.textTertiary}
-                  value={customPackageInput}
-                  onChangeText={setCustomPackageInput}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.addAppBtn,
-                    { backgroundColor: theme.colors.primaryLight, borderRadius: theme.radii.sm },
-                  ]}
-                  onPress={handleAddCustomPackage}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.addAppBtnText, { color: theme.colors.primaryDark }]}>
-                    Add
+              {/* Voice Module Diagnostic Status */}
+              <View
+                style={[
+                  styles.diagnosticBox,
+                  { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border, borderRadius: theme.radii.sm, marginTop: 12 },
+                ]}
+              >
+                <View style={styles.diagnosticRow}>
+                  <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
+                    Speech recognition:
                   </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Custom Allow List Badges */}
-              {notifSettings.allowedApps.length > 0 && (
-                <View style={styles.allowedBadgesWrap}>
-                  {notifSettings.allowedApps.map((pkg) => (
-                    <View
-                      key={pkg}
-                      style={[
-                        styles.allowedChip,
-                        { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border },
-                      ]}
-                    >
-                      <Text style={[styles.allowedChipText, { color: theme.colors.textPrimary }]}>
-                        {pkg}
-                      </Text>
-                      <TouchableOpacity onPress={() => handleRemoveCustomPackage(pkg)}>
-                        <Text style={[styles.removeAppX, { color: theme.colors.error }]}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
+                  <StatusBadge
+                    status={isVoiceModuleAvailable ? 'active' : 'info'}
+                    label={isVoiceModuleAvailable ? 'Native Linked' : 'Expo Go (Simulation)'}
+                    size="sm"
+                  />
                 </View>
-              )}
+
+                <View style={[styles.diagnosticRow, { marginTop: 6 }]}>
+                  <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
+                    Microphone Permission:
+                  </Text>
+                  <StatusBadge
+                    status={voicePermission === 'granted' ? 'active' : 'warning'}
+                    label={voicePermission === 'granted' ? 'Granted' : 'Not Granted'}
+                    size="sm"
+                  />
+                </View>
+
+                {voicePermission !== 'granted' && (
+                  <ScalePressable style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    onPress={handleRequestVoicePermission}
+                  >
+                    <Text style={[theme.typography.caption, { color: theme.colors.info, fontWeight: '700' }]}>
+                      Request Microphone Permission
+                    </Text>
+                    <Icon name="arrow-right" size={18} color={theme.colors.info} />
+                  </ScalePressable>
+                )}
+              </View>
             </View>
-          </View>
+          )}
         </View>
 
         {/* ========================================================
             4. CALENDAR & SCHEDULING
         ======================================================== */}
-        <View style={styles.section}>
-          <SectionHeader title="Calendar & Scheduling" />
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: theme.radii.md },
-              theme.shadows.sm,
-            ]}
-          >
-            <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
-              Target Destination Calendar
-            </Text>
-            <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
-              Current: <Text style={{ fontWeight: '700', color: theme.colors.textPrimary }}>{currentCalendarName}</Text>
-            </Text>
-
-            <View style={{ marginTop: 10 }}>
-              <SecondaryButton
-                label={calPermission?.granted ? 'Change Destination Calendar' : 'Grant Calendar Permission'}
-                onPress={() => {
-                  if (calPermission?.granted) {
-                    setShowCalendarPicker(true);
-                  } else {
-                    handleRequestCalendarPermission();
-                  }
-                }}
-              />
-            </View>
-
-            {/* Sync Behavior Transparency */}
+        <View style={styles.sectionContainer}>
+          {renderAccordionHeader(
+            'calendar',
+            'Calendar & Scheduling',
+            currentCalendarName,
+            'calendar',
+            theme.colors.agentCalendar
+          )}
+          {expandedSections['calendar'] && (
             <View
               style={[
-                styles.diagnosticBox,
-                { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderSubtle, borderRadius: theme.radii.sm, marginTop: 12 },
+                styles.accordionBody,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderBottomLeftRadius: theme.radii.md,
+                  borderBottomRightRadius: theme.radii.md,
+                },
               ]}
             >
-              <Text style={[theme.typography.titleSmall, { color: theme.colors.primaryLight }]}>
-                📅 Native Provider Write & Cloud Sync
+              <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
+                Target Destination Calendar
               </Text>
-              <Text style={[theme.typography.caption, { color: theme.colors.textSecondary, marginTop: 4, lineHeight: 18 }]}>
-                • Events created through LifeOS are written directly into Android's native <Text style={{ fontWeight: '700', color: theme.colors.textPrimary }}>CalendarProvider</Text>.{'\n'}
-                • Cloud sync to Google Calendar or Outlook is handled natively by your Android system account sync.{'\n'}
-                • LifeOS attaches a 15-minute advance reminder alarm to each scheduled event.
+              <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
+                Current: <Text style={{ fontWeight: '700', color: theme.colors.textPrimary }}>{currentCalendarName}</Text>
               </Text>
-            </View>
-          </View>
-        </View>
 
-        {/* ========================================================
-            5. PRIVACY & SECURITY GUARANTEES
-        ======================================================== */}
-        <View style={styles.section}>
-          <SectionHeader title="Privacy & Safety Boundaries" />
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: theme.radii.md },
-              theme.shadows.sm,
-            ]}
-          >
-            <Text style={[theme.typography.titleSmall, { color: theme.colors.success }]}>
-              🛡️ 100% On-Device Processing
-            </Text>
-            <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 4, lineHeight: 20 }]}>
-              LifeOS does not connect to external LLMs or third-party servers. Intent classification, slot extraction, supervisor orchestration, and notification sanitization run completely on-device.
-            </Text>
+              <View style={{ marginTop: 12 }}>
+                <SecondaryButton
+                  label={calPermission?.granted ? 'Change Destination Calendar' : 'Grant Calendar Permission'}
+                  icon="calendar"
+                  onPress={() => {
+                    if (calPermission?.granted) {
+                      setShowCalendarPicker(true);
+                    } else {
+                      handleRequestCalendarPermission();
+                    }
+                  }}
+                />
+              </View>
 
-            <View style={{ height: 1, backgroundColor: theme.colors.borderSubtle, marginVertical: 10 }} />
-
-            <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
-              💳 Financial Safety & Human Approval Gate
-            </Text>
-            <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 4, lineHeight: 20 }]}>
-              Actions parsed from financial notifications (UPI, cards, bank transfers) are masked and strictly require explicit human approval. LifeOS will never auto-execute or initiate money movement.
-            </Text>
-          </View>
-        </View>
-
-        {/* ========================================================
-            6. DATA MANAGEMENT & RESET
-        ======================================================== */}
-        <View style={styles.section}>
-          <SectionHeader title="Data Management" />
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: theme.radii.md },
-              theme.shadows.sm,
-            ]}
-          >
-            <Text style={[theme.typography.titleSmall, { color: theme.colors.error }]}>
-              Reset Local Notification Cache
-            </Text>
-            <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
-              Purges all stored notification items from the local SQLite database. Does not delete calendar events already scheduled in Android Calendar.
-            </Text>
-
-            <View style={{ marginTop: 12 }}>
-              <TouchableOpacity
-                style={[styles.dangerBtn, { backgroundColor: theme.colors.error, borderRadius: theme.radii.sm }]}
-                onPress={() => setShowClearConfirm(true)}
-                activeOpacity={0.8}
+              {/* Sync Behavior Transparency */}
+              <View
+                style={[
+                  styles.diagnosticBox,
+                  { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border, borderRadius: theme.radii.sm, marginTop: 12 },
+                ]}
               >
-                <Text style={styles.dangerBtnText}>Clear All Notification Data</Text>
-              </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Icon name="calendar" size={18} color={theme.colors.agentCalendar} />
+                  <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
+                    Native Provider Write & Cloud Sync
+                  </Text>
+                </View>
+                <Text style={[theme.typography.caption, { color: theme.colors.textSecondary, marginTop: 6, lineHeight: 18 }]}>
+                  • Events created through LifeOS are written directly into Android&apos;s native <Text style={{ fontWeight: '700', color: theme.colors.textPrimary }}>CalendarProvider</Text>.{'\n'}
+                  • Cloud sync to Google Calendar or Outlook is handled natively by your Android system account sync.{'\n'}
+                  • LifeOS attaches a 15-minute advance reminder alarm to each scheduled event.
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
+        </View>
+
+        {/* ========================================================
+            5. PRIVACY & SAFETY BOUNDARIES
+        ======================================================== */}
+        <View style={styles.sectionContainer}>
+          {renderAccordionHeader(
+            'privacy',
+            'Privacy',
+            'On-device processing and your data',
+            'shield',
+            theme.colors.success
+          )}
+          {expandedSections['privacy'] && (
+            <View
+              style={[
+                styles.accordionBody,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderBottomLeftRadius: theme.radii.md,
+                  borderBottomRightRadius: theme.radii.md,
+                },
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="shield" size={18} color={theme.colors.success} />
+                <Text style={[theme.typography.titleSmall, { color: theme.colors.success }]}>
+                  100% On-Device Processing
+                </Text>
+              </View>
+              <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 4, lineHeight: 20 }]}>
+                Your requests and captured alerts are analyzed on this device. Notification text is not sent to an AI service. Voice transcription depends on your device’s speech service.
+              </Text>
+
+              <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 12 }} />
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="lock" size={18} color={theme.colors.agentTask} />
+                <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
+                  Financial Safety & Human Approval Gate
+                </Text>
+              </View>
+              <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 4, lineHeight: 20 }]}>
+                Actions parsed from financial notifications (UPI, cards, bank transfers) are masked and strictly require explicit human approval. LifeOS will never auto-execute or initiate money movement.
+              </Text>
+              <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 16 }} />
+              <Text style={[theme.typography.titleSmall, { color: theme.colors.error }]}>
+                Reset Local Notification Cache
+              </Text>
+              <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
+                Purges all stored notification items from the local SQLite database. Does not delete calendar events already scheduled in Android Calendar.
+              </Text>
+
+              <View style={{ marginTop: 12 }}>
+                <ScalePressable style={[styles.dangerBtn, { backgroundColor: theme.colors.error, borderRadius: theme.radii.sm }]}
+                  onPress={() => setShowClearConfirm(true)}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="trash-2" size={18} color="#ffffff" />
+                  <Text style={[styles.dangerBtnText, { marginLeft: 6 }]}>Clear All Notification Data</Text>
+                </ScalePressable>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* ========================================================
             7. ABOUT LIFEOS
         ======================================================== */}
-        <View style={[styles.section, { marginBottom: 40 }]}>
-          <SectionHeader title="About LifeOS" />
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderRadius: theme.radii.md },
-              theme.shadows.sm,
-            ]}
-          >
-            <Text style={[theme.typography.titleMedium, { color: theme.colors.textPrimary }]}>
-              LifeOS Mobile Orchestrator
-            </Text>
-            <Text style={[theme.typography.caption, { color: theme.colors.textTertiary, marginTop: 2 }]}>
-              Version 1.0.0 • Final Year Project Demo
-            </Text>
+        <View style={[styles.sectionContainer, { marginBottom: 30 }]}>
+          {renderAccordionHeader(
+            'about',
+            'About LifeOS',
+            'v1.0.0 · Offline',
+            'info',
+            theme.colors.textSecondary
+          )}
+          {expandedSections['about'] && (
+            <View
+              style={[
+                styles.accordionBody,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderBottomLeftRadius: theme.radii.md,
+                  borderBottomRightRadius: theme.radii.md,
+                },
+              ]}
+            >
+              <Text style={[theme.typography.titleMedium, { color: theme.colors.textPrimary }]}>
+                LifeOS
+              </Text>
+              <Text style={[theme.typography.caption, { color: theme.colors.textTertiary, marginTop: 2 }]}>
+                Version 1.0.0
+              </Text>
 
-            <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 8, lineHeight: 18 }]}>
-              Architecture: Deterministic Rule-Based Parsing + Slot Extraction + SQLite Mapping Repository + Expo Native Modules.
-            </Text>
-          </View>
+              <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 8, lineHeight: 18 }]}>
+                Capture requests, review plans, and keep your day organized. Your requests are analyzed on this device.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -906,13 +1010,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               cal.id === calPreferences?.selectedCalendarId ||
               (!calPreferences?.selectedCalendarId && cal.isPrimary);
             return (
-              <TouchableOpacity
-                key={cal.id}
+              <ScalePressable key={cal.id}
                 style={[
                   styles.calendarOptionItem,
                   {
                     backgroundColor: isSelected ? theme.colors.surfaceSubtle : theme.colors.surface,
-                    borderColor: isSelected ? theme.colors.primaryLight : theme.colors.border,
+                    borderColor: isSelected ? theme.colors.info : theme.colors.border,
                     borderRadius: theme.radii.sm,
                   },
                 ]}
@@ -921,7 +1024,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               >
                 <View style={{ flex: 1 }}>
                   <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
-                    {cal.title} {cal.isPrimary ? '★ (Primary)' : ''}
+                    {cal.title} {cal.isPrimary ? '(Primary Default)' : ''}
                   </Text>
                   <Text style={[theme.typography.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>
                     {formatCalendarSourceDescription(cal)}
@@ -930,7 +1033,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 {isSelected && (
                   <StatusBadge status="active" label="Selected" size="sm" />
                 )}
-              </TouchableOpacity>
+              </ScalePressable>
             );
           })}
         </ScrollView>
@@ -963,10 +1066,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
-  headerRight: {
-    flexDirection: 'row',
-    gap: 8,
-  },
   headerActionBtn: {
     width: 38,
     height: 38,
@@ -975,20 +1074,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerActionIcon: {
-    fontSize: 16,
-  },
   scrollArea: {
     flex: 1,
   },
   scrollContent: {
     paddingBottom: 40,
   },
-  section: {
-    marginTop: 14,
+  sectionContainer: {
+    marginTop: 10,
   },
-  card: {
+  accordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
     borderWidth: 1,
+  },
+  accordionBody: {
+    borderWidth: 1,
+    borderTopWidth: 0,
     padding: 14,
   },
   themeSelectorRow: {
@@ -999,16 +1103,12 @@ const styles = StyleSheet.create({
   themeOptionBtn: {
     flex: 1,
     borderWidth: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  themeOptionIcon: {
-    fontSize: 18,
-    marginBottom: 4,
-  },
   themeOptionLabel: {
-    fontSize: 11,
+    fontSize: 13,
   },
   voiceLangRow: {
     flexDirection: 'row',
@@ -1025,7 +1125,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   voiceLangLabel: {
-    fontSize: 11,
+    fontSize: 13,
   },
   diagnosticBox: {
     borderWidth: 1,
@@ -1043,13 +1143,16 @@ const styles = StyleSheet.create({
   },
   smallActionBtn: {
     flex: 1,
+    flexDirection: 'row',
+    gap: 6,
     borderWidth: 1,
-    paddingVertical: 6,
+    paddingVertical: 8,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 4,
   },
   smallActionBtnText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   switchRow: {
@@ -1063,9 +1166,8 @@ const styles = StyleSheet.create({
   },
   restrictedToggle: {
     marginTop: 10,
-    padding: 8,
+    padding: 10,
     borderWidth: 1,
-    alignItems: 'center',
   },
   restrictedContent: {
     marginTop: 6,
@@ -1084,7 +1186,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   retentionChipText: {
-    fontSize: 11,
+    fontSize: 13,
   },
   knownAppsList: {
     marginTop: 8,
@@ -1094,7 +1196,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 8,
+    padding: 10,
     borderWidth: 1,
   },
   customAppRow: {
@@ -1107,15 +1209,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 10,
     height: 38,
-    fontSize: 12,
+    fontSize: 13,
   },
   addAppBtn: {
+    flexDirection: 'row',
     paddingHorizontal: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   addAppBtnText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   allowedBadgesWrap: {
@@ -1134,11 +1237,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   allowedChipText: {
-    fontSize: 11,
-  },
-  removeAppX: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 13,
   },
   calendarOptionItem: {
     flexDirection: 'row',
@@ -1149,13 +1248,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   dangerBtn: {
+    flexDirection: 'row',
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dangerBtnText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
 });

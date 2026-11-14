@@ -1,10 +1,12 @@
 import React from 'react';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { useTheme } from '../../theme';
+import { IconTile } from './IconTile';
+import { IconName } from './Icon';
 import { PrimaryButton } from './PrimaryButton';
 
 interface EmptyStateProps {
-  icon?: string | React.ReactNode;
+  icon?: IconName | string | React.ReactNode;
   title: string;
   description: string;
   actionLabel?: string;
@@ -13,7 +15,7 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  icon = '✨',
+  icon = 'inbox',
   title,
   description,
   actionLabel,
@@ -44,7 +46,15 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           },
         ]}
       >
-        {typeof icon === 'string' ? <Text style={styles.iconText}>{icon}</Text> : icon}
+        {typeof icon === 'string' ? (
+          icon.length > 2 || icon.match(/^[a-z\-]+$/i) ? (
+            <IconTile name={icon as IconName} color={icon === 'calendar' ? theme.colors.agentCalendar : icon === 'bell' ? theme.colors.agentReminder : theme.colors.agentInbox} />
+          ) : (
+            <Text style={styles.iconText}>{icon}</Text>
+          )
+        ) : (
+          icon
+        )}
       </View>
 
       <Text
@@ -63,7 +73,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
             color: theme.colors.textSecondary,
             marginTop: theme.spacing.xs,
             textAlign: 'center',
-            lineHeight: 20,
+            lineHeight: 22,
           },
         ]}
       >
@@ -87,15 +97,14 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 0,
   },
   iconText: {
-    fontSize: 28,
+    fontSize: 24,
   },
 });
-

@@ -1,155 +1,198 @@
+import { ScalePressable } from './Motion';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../theme';
+import { Icon } from './Icon';
 
-export type TabKey = 'home' | 'input' | 'inbox' | 'activity' | 'settings';
+export type TabKey = 'home' | 'inbox' | 'activity' | 'settings';
 
 interface BottomNavBarProps {
   activeTab: TabKey;
   onSelectTab: (tab: TabKey) => void;
+  onOpenQuickInput?: () => void;
   unreadInboxCount?: number;
 }
 
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   activeTab,
   onSelectTab,
+  onOpenQuickInput,
   unreadInboxCount = 0,
 }) => {
   const { theme } = useTheme();
-
-  const tabs: Array<{ key: TabKey; label: string; icon: string; isProminent?: boolean }> = [
-    { key: 'home', label: 'Home', icon: '🏠' },
-    { key: 'inbox', label: 'Inbox', icon: '📥' },
-    { key: 'input', label: 'Input', icon: '⚡', isProminent: true },
-    { key: 'activity', label: 'Activity', icon: '⏱️' },
-    { key: 'settings', label: 'Settings', icon: '⚙️' },
-  ];
+  const insets = useSafeAreaInsets();
 
   return (
-    <View
-      style={[
-        styles.barContainer,
-        {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.border,
-        },
-        theme.shadows.lg,
-      ]}
-    >
-      {tabs.map((tab) => {
-        const isActive = activeTab === tab.key;
+    <View style={[styles.outerContainer, { bottom: Math.max(insets.bottom, 12) }]} pointerEvents="box-none">
+      <View
+        style={[
+          styles.floatingBar,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+          },
+          theme.shadows.lg,
+        ]}
+      >
+        {/* 1. Home Tab */}
+        <ScalePressable style={styles.tabItem}
+          onPress={() => onSelectTab('home')}
+          activeOpacity={0.7}
+          accessibilityLabel="Home Tab"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'home' }}
+        >
+          <Icon
+            name="home" filled={activeTab === 'home'}
+            size={22}
+            color={activeTab === 'home' ? theme.colors.primary : theme.colors.textSecondary}
+          />
+          {activeTab === 'home' ? (
+            <>
+              <Text style={[styles.activeLabel, { color: theme.colors.primary }]}>Home</Text>
+              <View style={[styles.limeDot, { backgroundColor: theme.colors.primary }]} />
+            </>
+          ) : null}
+        </ScalePressable>
 
-        if (tab.isProminent) {
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              style={styles.prominentTabContainer}
-              onPress={() => onSelectTab(tab.key)}
-              activeOpacity={0.8}
-              accessibilityLabel={`${tab.label} Tab`}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isActive }}
-            >
-              <View
-                style={[
-                  styles.prominentCircle,
-                  {
-                    backgroundColor: isActive ? theme.colors.primaryLight : theme.colors.primary,
-                    borderColor: theme.colors.surface,
-                  },
-                  theme.shadows.md,
-                ]}
-              >
-                <Text style={styles.prominentIcon}>{tab.icon}</Text>
+        {/* 2. Inbox Tab */}
+        <ScalePressable style={styles.tabItem}
+          onPress={() => onSelectTab('inbox')}
+          activeOpacity={0.7}
+          accessibilityLabel="Inbox Tab"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'inbox' }}
+        >
+          <View style={styles.iconBadgeWrapper}>
+            <Icon
+              name="inbox" filled={activeTab === 'inbox'}
+              size={22}
+              color={activeTab === 'inbox' ? theme.colors.primary : theme.colors.textSecondary}
+            />
+            {unreadInboxCount > 0 && (
+              <View style={[styles.badge, { backgroundColor: theme.colors.agentInbox }]}>
+                <Text style={styles.badgeText}>
+                  {unreadInboxCount > 99 ? '99+' : unreadInboxCount}
+                </Text>
               </View>
-              <Text
-                style={[
-                  styles.tabLabel,
-                  {
-                    color: isActive ? theme.colors.primaryLight : theme.colors.textSecondary,
-                    fontWeight: '700',
-                    marginTop: 2,
-                  },
-                ]}
-              >
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        }
-
-        return (
-          <TouchableOpacity
-            key={tab.key}
-            style={styles.tabItem}
-            onPress={() => onSelectTab(tab.key)}
-            activeOpacity={0.7}
-            accessibilityLabel={`${tab.label} Tab`}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: isActive }}
-          >
-            <View style={styles.iconWrapper}>
-              <Text style={[styles.tabIcon, { opacity: isActive ? 1 : 0.65 }]}>{tab.icon}</Text>
-              {tab.key === 'inbox' && unreadInboxCount > 0 && (
-                <View style={[styles.badge, { backgroundColor: theme.colors.info }]}>
-                  <Text style={styles.badgeText}>
-                    {unreadInboxCount > 99 ? '99+' : unreadInboxCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Text
-              style={[
-                styles.tabLabel,
-                {
-                  color: isActive ? theme.colors.primaryLight : theme.colors.textTertiary,
-                  fontWeight: isActive ? '700' : '500',
-                },
-              ]}
-            >
-              {tab.label}
-            </Text>
-            {isActive && (
-              <View
-                style={[
-                  styles.activeIndicator,
-                  { backgroundColor: theme.colors.primaryLight },
-                ]}
-              />
             )}
-          </TouchableOpacity>
-        );
-      })}
+          </View>
+          {activeTab === 'inbox' ? (
+            <>
+              <Text style={[styles.activeLabel, { color: theme.colors.primary }]}>Inbox</Text>
+              <View style={[styles.limeDot, { backgroundColor: theme.colors.primary }]} />
+            </>
+          ) : null}
+        </ScalePressable>
+
+        {/* 3. Center Raised Quick Input Action */}
+        <ScalePressable style={styles.centerButtonContainer}
+          onPress={onOpenQuickInput || (() => onSelectTab('home'))}
+          activeOpacity={0.85}
+          accessibilityLabel="Quick Capture Request"
+          accessibilityRole="button"
+        >
+          <View
+            style={[
+              styles.centerCircle,
+              {
+                backgroundColor: theme.colors.surfaceElevated,
+                borderColor: theme.colors.border,
+              },
+              theme.shadows.md,
+            ]}
+          >
+            <Icon name="plus" size={22} color={theme.colors.textPrimary} />
+          </View>
+        </ScalePressable>
+
+        {/* 4. Activity Tab */}
+        <ScalePressable style={styles.tabItem}
+          onPress={() => onSelectTab('activity')}
+          activeOpacity={0.7}
+          accessibilityLabel="Activity Tab"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'activity' }}
+        >
+          <Icon
+            name="clock" filled={activeTab === 'activity'}
+            size={22}
+            color={activeTab === 'activity' ? theme.colors.primary : theme.colors.textSecondary}
+          />
+          {activeTab === 'activity' ? (
+            <>
+              <Text style={[styles.activeLabel, { color: theme.colors.primary }]}>Activity</Text>
+              <View style={[styles.limeDot, { backgroundColor: theme.colors.primary }]} />
+            </>
+          ) : null}
+        </ScalePressable>
+
+        {/* 5. Settings Tab */}
+        <ScalePressable style={styles.tabItem}
+          onPress={() => onSelectTab('settings')}
+          activeOpacity={0.7}
+          accessibilityLabel="Settings Tab"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'settings' }}
+        >
+          <Icon
+            name="settings" filled={activeTab === 'settings'}
+            size={22}
+            color={activeTab === 'settings' ? theme.colors.primary : theme.colors.textSecondary}
+          />
+          {activeTab === 'settings' ? (
+            <>
+              <Text style={[styles.activeLabel, { color: theme.colors.primary }]}>Settings</Text>
+              <View style={[styles.limeDot, { backgroundColor: theme.colors.primary }]} />
+            </>
+          ) : null}
+        </ScalePressable>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  barContainer: {
+  outerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 0,
+    zIndex: 100,
+  },
+  floatingBar: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     alignItems: 'center',
+    justifyContent: 'space-between',
     height: 64,
-    borderTopWidth: 1,
-    paddingHorizontal: 8,
+    borderRadius: 32,
+    borderWidth: 1,
+    paddingHorizontal: 12,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    position: 'relative',
-    minHeight: 48, // Accessible touch target
+    paddingVertical: 8,
   },
-  iconWrapper: {
-    position: 'relative',
-  },
-  tabIcon: {
-    fontSize: 20,
-  },
-  tabLabel: {
-    fontSize: 10,
+  activeLabel: {
+    fontSize: 13,
+    fontWeight: '700',
     marginTop: 2,
+    letterSpacing: 0.2,
+  },
+  limeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 2,
+  },
+  iconBadgeWrapper: {
+    position: 'relative',
   },
   badge: {
     position: 'absolute',
@@ -163,34 +206,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   badgeText: {
-    color: '#ffffff',
-    fontSize: 9,
+    color: '#0B0F14',
+    fontSize: 13,
     fontWeight: '800',
   },
-  activeIndicator: {
-    position: 'absolute',
-    bottom: 4,
-    width: 14,
-    height: 2.5,
-    borderRadius: 1.5,
-  },
-  prominentTabContainer: {
+  centerButtonContainer: {
+    top: -14,
     alignItems: 'center',
     justifyContent: 'center',
-    top: -10,
-    width: 68,
+    width: 58,
   },
-  prominentCircle: {
+  centerCircle: {
     width: 50,
     height: 50,
     borderRadius: 25,
+    borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-  },
-  prominentIcon: {
-    fontSize: 22,
-    color: '#ffffff',
   },
 });
-

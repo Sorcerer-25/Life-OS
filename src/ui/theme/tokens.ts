@@ -1,4 +1,4 @@
-import { Platform, ViewStyle } from 'react-native';
+import { ViewStyle } from 'react-native';
 
 export const spacing = {
   none: 0,
@@ -31,62 +31,4 @@ export interface Shadows {
   lg: ViewStyle;
 }
 
-export const shadows: Shadows = {
-  none: {
-    ...Platform.select({
-      ios: {
-        shadowColor: 'transparent',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0,
-        shadowRadius: 0,
-      },
-      android: {
-        elevation: 0,
-      },
-      default: {},
-    }),
-  },
-  sm: {
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.12,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 2,
-      },
-      default: {},
-    }),
-  },
-  md: {
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.18,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 4,
-      },
-      default: {},
-    }),
-  },
-  lg: {
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.24,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 8,
-      },
-      default: {},
-    }),
-  },
-};
-
+export const shadows: Shadows = { none: {}, sm: {}, md: {}, lg: {} };

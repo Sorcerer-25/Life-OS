@@ -1,21 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import {
-  defaultVoiceService,
-  VoiceLanguage,
-  VoiceRecognitionState,
-  VoiceService,
-} from '../../voice/voiceService';
+import { ScalePressable, useReducedMotion } from './core/Motion';
+import React, { useEffect, useState , useCallback } from 'react';
+import { ActivityIndicator, Animated, Modal, StyleSheet, Text, TextInput, View } from 'react-native';
+import { defaultVoiceService, VoiceLanguage, VoiceRecognitionState, VoiceService } from '../../voice/voiceService';
 import { useTheme } from '../theme';
+import { Icon } from './core/Icon';
 import { IconButton } from './core/IconButton';
 import { PrimaryButton } from './core/PrimaryButton';
 import { SecondaryButton } from './core/SecondaryButton';
@@ -39,6 +27,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
   defaultLanguage = 'en-IN',
 }) => {
   const { theme } = useTheme();
+  const reducedMotion = useReducedMotion();
 
   const [language, setLanguage] = useState<VoiceLanguage>(defaultLanguage);
   const [recordingState, setRecordingState] = useState<VoiceRecognitionState>('idle');
@@ -49,63 +38,61 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
   const [isModuleAvailable, setIsModuleAvailable] = useState<boolean>(true);
 
   // Pulse animation for recording wave
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(1));
+  const [pulseOpacity] = useState(() => new Animated.Value(0.6));
 
   useEffect(() => {
     let animLoop: Animated.CompositeAnimation | null = null;
-    if (recordingState === 'listening') {
+    if (recordingState === 'listening' && !reducedMotion && visible) {
       animLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.25,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
+        Animated.parallel([
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.4,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.sequence([
+            Animated.timing(pulseOpacity, {
+              toValue: 0.15,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseOpacity, {
+              toValue: 0.6,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ]),
         ])
       );
       animLoop.start();
     } else {
       pulseAnim.setValue(1);
+      pulseOpacity.setValue(0.6);
     }
 
     return () => {
       animLoop?.stop();
     };
-  }, [recordingState]);
+  }, [recordingState, reducedMotion, visible, pulseAnim, pulseOpacity]);
 
-  useEffect(() => {
-    if (visible) {
-      resetState();
-      const available = voiceService.isAvailable();
-      setIsModuleAvailable(available);
 
-      if (available) {
-        startListening(language);
-      } else {
-        setErrorMessage(
-          'On-device speech recognition module is not available in Expo Go. In an Android development build, native speech recognition operates offline.'
-        );
-      }
-    } else {
-      voiceService.abortListening();
-      resetState();
-    }
-  }, [visible]);
-
-  const resetState = () => {
+  const resetState = useCallback(() => {
     setTranscript('');
     setConfidence(undefined);
     setErrorMessage(null);
     setIsPermanentlyDenied(false);
     setRecordingState('idle');
-  };
+  }, []);
 
-  const startListening = async (lang: VoiceLanguage) => {
+  const startListening = useCallback(async (lang: VoiceLanguage) => {
     setErrorMessage(null);
     setIsPermanentlyDenied(false);
     setTranscript('');
@@ -133,23 +120,15 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
       },
     });
 
-    if (!started && !errorMessage) {
-      setRecordingState('idle');
-    }
-  };
+    if (!started) setRecordingState(previous => previous === 'error' ? previous : 'idle');
+  }, [voiceService]);
 
   const handleStop = async () => {
     await voiceService.stopListening();
     setRecordingState('idle');
   };
 
-  const handleLanguageChange = (newLang: VoiceLanguage) => {
-    setLanguage(newLang);
-    if (recordingState === 'listening') {
-      voiceService.abortListening();
-      startListening(newLang);
-    }
-  };
+  const handleLanguageChange = (newLang: VoiceLanguage) => setLanguage(newLang);
 
   const handleSend = () => {
     const trimmed = transcript.trim();
@@ -164,6 +143,30 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
     });
     onClose();
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+    if (visible) {
+      resetState();
+      const available = voiceService.isAvailable();
+      setIsModuleAvailable(available);
+
+      if (available) {
+        startListening(language);
+      } else {
+        setErrorMessage(
+          'On-device speech recognition module is not available in Expo Go. In an Android development build, native speech recognition operates offline.'
+        );
+      }
+    } else {
+      voiceService.abortListening();
+      resetState();
+    }
+    });
+    return () => { cancelled = true; voiceService.abortListening(); };
+  }, [visible, language, startListening, resetState, voiceService]);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -190,15 +193,18 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
               },
             ]}
           >
-            <View style={{ flex: 1 }}>
-              <Text style={[theme.typography.titleLarge, { color: theme.colors.textPrimary }]}>
-                🎤 Voice Request
-              </Text>
-              <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
-                On-device speech recognition. Editable before sending.
-              </Text>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Icon name="mic" size={18} color={theme.colors.info} />
+              <View style={{ flex: 1 }}>
+                <Text style={[theme.typography.titleLarge, { color: theme.colors.textPrimary }]}>
+                  Voice Request
+                </Text>
+                <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2 }]}>
+                  On-device speech recognition. Editable before sending.
+                </Text>
+              </View>
             </View>
-            <IconButton icon="✕" onPress={onClose} accessibilityLabel="Close voice modal" size="sm" />
+            <IconButton icon="x" onPress={onClose} accessibilityLabel="Close voice modal" size="sm" />
           </View>
 
           {/* Language Selector */}
@@ -209,40 +215,44 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
             <View style={styles.languageToggles}>
               {(
                 [
-                  { key: 'en-IN', label: '🇮🇳 English (India)' },
-                  { key: 'en-US', label: '🇺🇸 English (US)' },
+                  { key: 'en-IN', label: 'English (India)' },
+                  { key: 'en-US', label: 'English (US)' },
                 ] as const
               ).map((langItem) => {
                 const isActive = language === langItem.key;
                 return (
-                  <TouchableOpacity
-                    key={langItem.key}
+                  <ScalePressable key={langItem.key}
                     style={[
                       styles.languageChip,
                       {
                         backgroundColor: isActive
-                          ? theme.colors.primaryMuted
-                          : theme.colors.surfaceSubtle,
-                        borderColor: isActive ? theme.colors.primaryLight : theme.colors.border,
+                          ? theme.colors.surfaceSubtle
+                          : theme.colors.surface,
+                        borderColor: isActive ? theme.colors.info : theme.colors.border,
                         borderRadius: theme.radii.sm,
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 6,
                       },
                     ]}
                     onPress={() => handleLanguageChange(langItem.key)}
                     disabled={recordingState === 'listening'}
                     activeOpacity={0.7}
                   >
+                    <Icon name="globe" size={18} color={isActive ? theme.colors.info : theme.colors.textSecondary} />
                     <Text
                       style={[
                         theme.typography.bodySmall,
                         {
-                          color: isActive ? theme.colors.primaryLight : theme.colors.textSecondary,
+                          color: isActive ? theme.colors.textPrimary : theme.colors.textSecondary,
                           fontWeight: isActive ? '700' : '500',
                         },
                       ]}
                     >
                       {langItem.label}
                     </Text>
-                  </TouchableOpacity>
+                  </ScalePressable>
                 );
               })}
             </View>
@@ -252,22 +262,33 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
           <View style={styles.indicatorContainer}>
             {recordingState === 'listening' ? (
               <View style={styles.listeningCenter}>
-                <Animated.View
-                  style={[
-                    styles.pulseCircle,
-                    {
-                      backgroundColor: theme.colors.errorSurface,
-                      borderColor: theme.colors.error,
-                      transform: [{ scale: pulseAnim }],
-                    },
-                  ]}
-                >
-                  <Text style={styles.micIconLarge}>🎙️</Text>
-                </Animated.View>
+                <View style={{ width: 88, height: 88, alignItems: 'center', justifyContent: 'center' }}>
+                  <Animated.View
+                    style={[
+                      styles.pulsingRing,
+                      {
+                        borderColor: theme.colors.error,
+                        transform: [{ scale: pulseAnim }],
+                        opacity: pulseOpacity,
+                      },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.pulseCircle,
+                      {
+                        backgroundColor: theme.colors.surfaceSubtle,
+                        borderColor: theme.colors.error,
+                      },
+                    ]}
+                  >
+                    <Icon name="mic" size={18} color={theme.colors.error} />
+                  </View>
+                </View>
                 <Text
                   style={[
                     theme.typography.titleSmall,
-                    { color: theme.colors.primaryLight, marginTop: theme.spacing.md },
+                    { color: theme.colors.textPrimary, marginTop: theme.spacing.md },
                   ]}
                 >
                   Listening... Speak your request
@@ -275,7 +296,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
               </View>
             ) : recordingState === 'processing' ? (
               <View style={styles.listeningCenter}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <ActivityIndicator size="large" color={theme.colors.info} />
                 <Text
                   style={[
                     theme.typography.bodyMedium,
@@ -296,7 +317,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
                     },
                   ]}
                 >
-                  <Text style={styles.micIconLarge}>🎙️</Text>
+                  <Icon name="mic" size={18} color={theme.colors.textSecondary} />
                 </View>
                 <Text
                   style={[
@@ -320,32 +341,37 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
               style={[
                 styles.noticeBanner,
                 {
-                  backgroundColor: !isModuleAvailable
-                    ? theme.colors.infoSurface
-                    : theme.colors.errorSurface,
+                  backgroundColor: theme.colors.surfaceSubtle,
                   borderColor: !isModuleAvailable
-                    ? theme.colors.infoBorder
-                    : theme.colors.errorBorder,
+                    ? theme.colors.border
+                    : theme.colors.error,
                   borderRadius: theme.radii.sm,
                   padding: theme.spacing.md,
                   marginBottom: theme.spacing.sm,
                 },
               ]}
             >
-              <Text
-                style={[
-                  theme.typography.bodySmall,
-                  {
-                    color: !isModuleAvailable
-                      ? theme.colors.infoForeground
-                      : theme.colors.errorForeground,
-                    lineHeight: 18,
-                  },
-                ]}
-              >
-                {!isModuleAvailable ? 'ℹ️ ' : '⚠️ '}
-                {errorMessage}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Icon
+                  name={!isModuleAvailable ? 'info' : 'alert-triangle'}
+                  size={18}
+                  color={!isModuleAvailable ? theme.colors.info : theme.colors.error}
+                />
+                <Text
+                  style={[
+                    theme.typography.bodySmall,
+                    {
+                      color: !isModuleAvailable
+                        ? theme.colors.textSecondary
+                        : theme.colors.error,
+                      lineHeight: 22,
+                      flex: 1,
+                    },
+                  ]}
+                >
+                  {errorMessage}
+                </Text>
+              </View>
               {isPermanentlyDenied && (
                 <View style={{ marginTop: theme.spacing.sm }}>
                   <SecondaryButton
@@ -412,7 +438,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
               { color: theme.colors.textTertiary, marginVertical: theme.spacing.sm, textAlign: 'center' },
             ]}
           >
-            ℹ️ Uses Android on-device speech engine. Offline capability depends on offline voice packs.
+            Uses Android on-device speech engine. Offline capability depends on offline voice packs.
           </Text>
 
           {/* Action Buttons */}
@@ -421,7 +447,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
               <View style={{ flex: 1 }}>
                 <PrimaryButton
                   label="Stop & Review"
-                  icon="⏹️"
+                  icon="square"
                   onPress={handleStop}
                   variant="danger"
                 />
@@ -430,7 +456,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
               <View style={{ flex: 1 }}>
                 <SecondaryButton
                   label={transcript ? 'Re-record' : 'Start Speaking'}
-                  icon="🎙️"
+                  icon="mic"
                   onPress={() => startListening(language)}
                   disabled={!isModuleAvailable}
                 />
@@ -440,7 +466,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
             <View style={{ flex: 1 }}>
               <PrimaryButton
                 label="Send to LifeOS"
-                icon="⚡"
+                icon="zap"
                 onPress={handleSend}
                 disabled={!transcript.trim() || recordingState === 'listening'}
               />
@@ -491,6 +517,13 @@ const styles = StyleSheet.create({
   },
   listeningCenter: {
     alignItems: 'center',
+  },
+  pulsingRing: {
+    position: 'absolute',
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 2,
   },
   pulseCircle: {
     width: 68,

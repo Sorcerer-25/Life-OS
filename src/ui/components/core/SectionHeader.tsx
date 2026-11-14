@@ -1,5 +1,6 @@
+import { ScalePressable } from './Motion';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../theme';
 
 interface SectionHeaderProps {
@@ -31,12 +32,12 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
               style={[
                 styles.badge,
                 {
-                  backgroundColor: theme.colors.primaryMuted,
-                  borderColor: theme.colors.primaryDark,
+                  backgroundColor: theme.colors.surfaceSubtle,
+                  borderColor: theme.colors.textSecondary,
                 },
               ]}
             >
-              <Text style={[styles.badgeText, { color: theme.colors.primaryLight }]}>{badge}</Text>
+              <Text style={[styles.badgeText, { color: theme.colors.textPrimary }]}>{badge}</Text>
             </View>
           )}
         </View>
@@ -48,11 +49,11 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
       </View>
 
       {actionLabel && onAction && (
-        <TouchableOpacity onPress={onAction} activeOpacity={0.7} style={styles.actionBtn}>
-          <Text style={[theme.typography.label, { color: theme.colors.primaryLight }]}>
+        <ScalePressable onPress={onAction} activeOpacity={0.7} style={styles.actionBtn}>
+          <Text style={[theme.typography.label, { color: theme.colors.textPrimary }]}>
             {actionLabel}
           </Text>
-        </TouchableOpacity>
+        </ScalePressable>
       )}
     </View>
   );
@@ -79,7 +80,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '800',
   },
   actionBtn: {

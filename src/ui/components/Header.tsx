@@ -1,5 +1,7 @@
+import { ScalePressable } from './core/Motion';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Icon } from './core/Icon';
 
 interface HeaderProps {
   onOpenCalendarSettings?: () => void;
@@ -39,39 +41,54 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Navigation Buttons for Notification & Calendar Features */}
       <View style={styles.navRow}>
         {onOpenNotificationInbox && (
-          <TouchableOpacity style={[styles.navButton, styles.navButtonHighlight]} onPress={onOpenNotificationInbox}>
+          <ScalePressable style={[styles.navButton, styles.navButtonHighlight]} onPress={onOpenNotificationInbox}>
             <View style={styles.buttonBadgeContainer}>
-              <Text style={styles.navButtonTextHighlight}>📥 Inbox</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Icon name="inbox" size={18} color="#38bdf8" />
+                <Text style={styles.navButtonTextHighlight}>Inbox</Text>
+              </View>
               {unreadNotificationCount > 0 && (
                 <View style={styles.countBadge}>
                   <Text style={styles.countBadgeText}>{unreadNotificationCount}</Text>
                 </View>
               )}
             </View>
-          </TouchableOpacity>
+          </ScalePressable>
         )}
         {onOpenSimulateNotification && (
-          <TouchableOpacity style={styles.navButton} onPress={onOpenSimulateNotification}>
-            <Text style={styles.navButtonText}>🔔 Simulate</Text>
-          </TouchableOpacity>
+          <ScalePressable style={styles.navButton} onPress={onOpenSimulateNotification}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="bell" size={18} color="#94a3b8" />
+              <Text style={styles.navButtonText}>Simulate</Text>
+            </View>
+          </ScalePressable>
         )}
         {onOpenNotificationSettings && (
-          <TouchableOpacity style={styles.navButton} onPress={onOpenNotificationSettings}>
-            <Text style={styles.navButtonText}>⚙️ Alerts</Text>
-          </TouchableOpacity>
+          <ScalePressable style={styles.navButton} onPress={onOpenNotificationSettings}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="settings" size={18} color="#94a3b8" />
+              <Text style={styles.navButtonText}>Alerts</Text>
+            </View>
+          </ScalePressable>
         )}
       </View>
 
       <View style={styles.navRowSecondary}>
         {onOpenCalendarSettings && (
-          <TouchableOpacity style={styles.navButtonSecondary} onPress={onOpenCalendarSettings}>
-            <Text style={styles.navButtonSecondaryText}>⚙️ Calendar Settings</Text>
-          </TouchableOpacity>
+          <ScalePressable style={styles.navButtonSecondary} onPress={onOpenCalendarSettings}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="settings" size={18} color="#94a3b8" />
+              <Text style={styles.navButtonSecondaryText}>Calendar Settings</Text>
+            </View>
+          </ScalePressable>
         )}
         {onOpenCreatedEvents && (
-          <TouchableOpacity style={styles.navButtonSecondary} onPress={onOpenCreatedEvents}>
-            <Text style={styles.navButtonSecondaryText}>🗓️ Created Events</Text>
-          </TouchableOpacity>
+          <ScalePressable style={styles.navButtonSecondary} onPress={onOpenCreatedEvents}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="calendar" size={18} color="#94a3b8" />
+              <Text style={styles.navButtonSecondaryText}>Created Events</Text>
+            </View>
+          </ScalePressable>
         )}
       </View>
     </View>
@@ -110,13 +127,13 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: '#94a3b8',
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '600',
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#94a3b8',
-    lineHeight: 16,
+    lineHeight: 22,
     marginBottom: 8,
   },
   statusRow: {
@@ -132,7 +149,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#cbd5e1',
   },
   boldText: {
@@ -171,7 +188,7 @@ const styles = StyleSheet.create({
   },
   navButtonTextHighlight: {
     color: '#38bdf8',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   countBadge: {
@@ -182,12 +199,12 @@ const styles = StyleSheet.create({
   },
   countBadgeText: {
     color: '#f8fafc',
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '800',
   },
   navButtonText: {
     color: '#cbd5e1',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   navButtonSecondary: {
@@ -202,7 +219,7 @@ const styles = StyleSheet.create({
   },
   navButtonSecondaryText: {
     color: '#94a3b8',
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '600',
   },
 });

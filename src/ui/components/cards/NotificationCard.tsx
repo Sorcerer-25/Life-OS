@@ -1,10 +1,19 @@
-import React from 'react';
-import { StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { ScalePressable, animateLayout } from '../core/Motion';
+import { actionDate, agentType, humanLabel, notificationResult } from '../../presentation';
+import { SuccessFeedback } from '../core/SuccessFeedback';
+import React, { useState } from 'react';
+import { Platform, StyleSheet, Text, UIManager, View, ViewStyle } from 'react-native';
 import { NotificationInboxItem } from '../../../models/NotificationEvent';
 import { useTheme } from '../../theme';
+import { Icon } from '../core/Icon';
+import { IconTile } from '../core/IconTile';
 import { PrimaryButton } from '../core/PrimaryButton';
 import { SecondaryButton } from '../core/SecondaryButton';
 import { StatusBadge } from '../core/StatusBadge';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface NotificationCardProps {
   item: NotificationInboxItem;
@@ -28,6 +37,12 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
   style,
 }) => {
   const { theme } = useTheme();
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
+
+  const toggleTechnicalDetails = () => {
+    animateLayout();
+    setShowTechnicalDetails(!showTechnicalDetails);
+  };
 
   const formattedTime = (() => {
     try {
@@ -37,6 +52,25 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
       return '';
     }
   })();
+
+  // Resolve primary agent for this notification
+  const primaryAgent = (() => {
+    const act = item.action_plan?.actions?.[0];
+    if (act?.agent) {
+      const a = act.agent.toLowerCase();
+      if (a.includes('calendar')) return 'calendar' as const;
+      if (a.includes('reminder')) return 'reminder' as const;
+      if (a.includes('task')) return 'task' as const;
+    }
+    const intent = item.analysis?.intents?.[0]?.intent?.toLowerCase();
+    if (intent?.includes('calendar') || intent?.includes('event') || intent?.includes('schedule')) return 'calendar' as const;
+    if (intent?.includes('reminder')) return 'reminder' as const;
+    if (intent?.includes('task')) return 'task' as const;
+    return 'inbox' as const;
+  })();
+
+  // Build a clean human-readable result line
+  const formatCleanResult = () => notificationResult(item.action_plan, item.execution_result);
 
   return (
     <View
@@ -48,29 +82,31 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
           borderRadius: theme.radii.md,
           padding: theme.spacing.md,
         },
-        theme.shadows.sm,
         style,
       ]}
     >
-      {/* Top Header: App Badge & Status */}
+      {/* Top Header: Agent Icon Tile + App Badge + Status */}
       <View style={styles.headerRow}>
-        <View
-          style={[
-            styles.appBadge,
-            {
-              backgroundColor: theme.colors.surfaceSubtle,
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <Text style={[styles.appBadgeText, { color: theme.colors.primaryLight }]}>
-            {item.app_label}
-          </Text>
+        <View style={styles.headerLeft}>
+          <IconTile agent={primaryAgent} size={34} iconSize={18} style={{ marginRight: 8 }} />
+          <View
+            style={[
+              styles.appBadge,
+              {
+                backgroundColor: theme.colors.surfaceSubtle,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
+            <Text style={[styles.appBadgeText, { color: theme.colors.textPrimary }]}>
+              {item.app_label}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.headerRight}>
           {formattedTime ? (
-            <Text style={[theme.typography.caption, { color: theme.colors.textTertiary }]}>
+            <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
               {formattedTime}
             </Text>
           ) : null}
@@ -82,7 +118,7 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
       <Text
         style={[
           theme.typography.titleSmall,
-          { color: theme.colors.textPrimary, marginTop: theme.spacing.xs },
+          { color: theme.colors.textPrimary, marginTop: theme.spacing.sm },
         ]}
         numberOfLines={compact ? 1 : 2}
       >
@@ -91,37 +127,30 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
 
       <Text
         style={[
-          theme.typography.bodySmall,
-          { color: theme.colors.textSecondary, marginTop: 2, lineHeight: 18 },
+          theme.typography.bodyMedium,
+          { color: theme.colors.textSecondary, marginTop: 4, lineHeight: 22 },
         ]}
         numberOfLines={compact ? 2 : 4}
       >
         {item.text}
       </Text>
 
-      {/* Package Meta */}
-      {!compact && (
-        <Text style={[theme.typography.caption, { color: theme.colors.textMuted, marginTop: 4 }]}>
-          App: {item.source_app}
-        </Text>
-      )}
-
-      {/* Analysed Details (if analysed) */}
+      {/* Detected Intent & Plan (if analysed) */}
       {!compact && item.analysis && (
         <View
           style={[
             styles.analysisBox,
             {
               backgroundColor: theme.colors.surfaceSubtle,
-              borderColor: theme.colors.borderSubtle,
-              borderRadius: theme.radii.xs,
-              marginTop: theme.spacing.sm,
+              borderColor: theme.colors.border,
+              borderRadius: theme.radii.sm,
+              marginTop: theme.spacing.md,
             },
           ]}
         >
           <View style={styles.analysisHeader}>
-            <Text style={[theme.typography.caption, { color: theme.colors.textTertiary, fontWeight: '700' }]}>
-              DETECTED INTENT & PLAN
+            <Text style={[theme.typography.caption, { color: theme.colors.textSecondary, fontWeight: '700' }]}>
+              DETECTED PLAN
             </Text>
             {item.action_plan?.decision.workflow_status && (
               <StatusBadge status={item.action_plan.decision.workflow_status} size="sm" />
@@ -129,57 +158,89 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
           </View>
 
           {item.analysis.intents.map((intent: any, idx: number) => (
-            <Text
-              key={idx}
-              style={[theme.typography.bodySmall, { color: theme.colors.textPrimary, marginTop: 2 }]}
-            >
-              🎯 {intent.intent} ({(intent.confidence * 100).toFixed(0)}%)
-            </Text>
+            <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              <Icon name="check" size={18} color={theme.colors.success} style={{ marginRight: 6 }} />
+              <Text style={[theme.typography.bodySmall, { color: theme.colors.textPrimary, flex: 1 }]}>
+                {humanLabel(intent.intent)}
+              </Text>
+            </View>
           ))}
 
           {item.action_plan?.actions.map((act: any, idx: number) => (
             <View key={idx} style={styles.actionPlanRow}>
-              <Text style={[theme.typography.caption, { color: theme.colors.accent, fontWeight: '600' }]}>
-                🤖 {act.agent} • {act.operation}
-              </Text>
-              {act.requires_confirmation && (
-                <Text style={[theme.typography.caption, { color: theme.colors.warningForeground }]}>
-                  ⚠️ Confirmation required
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <IconTile agent={agentType(act.agent)} size={30} style={{ marginRight: 6 }} />
+                <Text style={[theme.typography.caption, { color: theme.colors.textPrimary, fontWeight: '600' }]}>
+                  {humanLabel(act.operation)} {actionDate(act.data as Record<string, unknown>)}
                 </Text>
-              )}
+              </View>
+              {act.requires_confirmation ? (
+                <Text style={[theme.typography.caption, { color: theme.colors.warning }]}>
+                  Confirmation req
+                </Text>
+              ) : null}
             </View>
           ))}
         </View>
       )}
 
-      {/* Execution Result (if actioned) */}
-      {!compact && item.status === 'actioned' && item.execution_result && (
+      {/* Clean Result Line (if actioned) - Hides raw JSON behind expander */}
+      {!compact && item.status === 'actioned' && (
         <View
           style={[
             styles.resultBox,
             {
-              backgroundColor: theme.colors.successSurface,
+              backgroundColor: theme.colors.surfaceSubtle,
               borderColor: theme.colors.successBorder,
-              borderRadius: theme.radii.xs,
+              borderRadius: theme.radii.sm,
               marginTop: theme.spacing.sm,
             },
           ]}
         >
-          <Text style={[theme.typography.caption, { color: theme.colors.successForeground, fontWeight: '700' }]}>
-            ✓ Execution Succeeded
-          </Text>
-          <Text style={[theme.typography.code, { color: theme.colors.textSecondary, marginTop: 2 }]}>
-            {JSON.stringify(item.execution_result, null, 2)}
-          </Text>
+          <SuccessFeedback label={formatCleanResult()} />
+
+          {/* Technical Details Expander */}
+          <ScalePressable style={styles.techToggleRow}
+            onPress={toggleTechnicalDetails}
+            activeOpacity={0.7}
+          >
+            <Text style={[theme.typography.caption, { color: theme.colors.textSecondary, fontWeight: '600' }]}>
+              Technical details
+            </Text>
+            <Icon
+              name={showTechnicalDetails ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color={theme.colors.textSecondary}
+              style={{ marginLeft: 4 }}
+            />
+          </ScalePressable>
+
+          {showTechnicalDetails && item.execution_result && (
+            <View
+              style={[
+                styles.jsonContainer,
+                {
+                  backgroundColor: theme.colors.background,
+                  borderColor: theme.colors.border,
+                  borderRadius: theme.radii.xs,
+                  marginTop: 6,
+                },
+              ]}
+            >
+              <Text style={[theme.typography.code, { color: theme.colors.textSecondary }]}>
+                {JSON.stringify(item.execution_result, null, 2)}
+              </Text>
+            </View>
+          )}
         </View>
       )}
 
       {/* Action Buttons Row */}
-      <View style={[styles.actionsRow, { marginTop: theme.spacing.md }]}>
+      <View style={[styles.actionsRow, { marginTop: theme.spacing.md, flexWrap: 'wrap' }]}>
         {item.status === 'new' && onAnalyse && (
           <PrimaryButton
             label="Analyse Request"
-            icon="⚡"
+            icon="zap"
             onPress={() => onAnalyse(item.id)}
             isLoading={isProcessing}
             size="sm"
@@ -191,7 +252,7 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
             {onEdit && (
               <SecondaryButton
                 label="Edit"
-                icon="✏️"
+                icon="settings"
                 onPress={() => onEdit(item)}
                 disabled={isProcessing}
                 size="sm"
@@ -199,8 +260,8 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
             )}
             {onApprove && (
               <PrimaryButton
-                label="Approve & Execute"
-                icon="✓"
+                label="Approve plan"
+                icon="check"
                 onPress={() => onApprove(item.id)}
                 isLoading={isProcessing}
                 size="sm"
@@ -232,15 +293,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   appBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 6,
     borderWidth: 1,
   },
   appBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
   },
   headerRight: {
     flexDirection: 'row',
@@ -248,25 +313,39 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   analysisBox: {
-    padding: 8,
+    padding: 10,
     borderWidth: 1,
   },
   analysisHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   actionPlanRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 4,
-    paddingTop: 4,
+    marginTop: 6,
+    paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.05)',
   },
   resultBox: {
+    padding: 10,
+    borderWidth: 1,
+  },
+  resultLineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  techToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  jsonContainer: {
     padding: 8,
     borderWidth: 1,
   },

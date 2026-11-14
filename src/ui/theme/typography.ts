@@ -27,46 +27,45 @@ export const typography: TypographyScale = {
     letterSpacing: -0.3,
   },
   titleMedium: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    lineHeight: 22,
+    lineHeight: 24,
     letterSpacing: -0.2,
   },
   titleSmall: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    lineHeight: 20,
+    lineHeight: 22,
   },
   bodyLarge: {
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 24,
+  },
+  bodyMedium: {
     fontSize: 15,
     fontWeight: '400',
     lineHeight: 22,
   },
-  bodyMedium: {
-    fontSize: 13,
-    fontWeight: '400',
-    lineHeight: 18,
-  },
   bodySmall: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '400',
-    lineHeight: 16,
+    lineHeight: 22,
   },
   label: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
   caption: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '500',
-    lineHeight: 14,
+    lineHeight: 19,
   },
   code: {
     fontFamily: 'monospace',
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 18,
   },
 };
-

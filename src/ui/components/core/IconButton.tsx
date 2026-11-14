@@ -1,15 +1,11 @@
-import React from 'react';
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { useReducedMotion } from './Motion';
+import React, { useState } from 'react';
+import { Animated, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { useTheme } from '../../theme';
+import { Icon, IconName } from './Icon';
 
 interface IconButtonProps {
-  icon: string | React.ReactNode;
+  icon: IconName | string | React.ReactNode;
   onPress: () => void;
   accessibilityLabel: string;
   badgeCount?: number;
@@ -32,13 +28,24 @@ export const IconButton: React.FC<IconButtonProps> = ({
   testID,
 }) => {
   const { theme } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const [scaleAnim] = useState(() => new Animated.Value(1));
+
+  const handlePressIn = () => {
+    if (reducedMotion) return;
+    Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true, speed: 24 }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, { toValue: 1, friction: 4, useNativeDriver: true }).start();
+  };
 
   const getDimension = () => {
     switch (size) {
       case 'sm':
-        return 38;
+        return 36;
       case 'lg':
-        return 52;
+        return 50;
       case 'md':
       default:
         return 44; // Ensures minimum accessible touch target
@@ -59,47 +66,61 @@ export const IconButton: React.FC<IconButtonProps> = ({
     return theme.colors.border;
   };
 
+  const getIconColor = () => {
+    if (variant === 'primary') return theme.colors.primaryForeground;
+    if (variant === 'danger') return theme.colors.error;
+    return theme.colors.textPrimary;
+  };
+
   const dim = getDimension();
+  const iconSize = 18;
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.button,
-        {
-          width: dim,
-          height: dim,
-          borderRadius: dim / 2,
-          backgroundColor: getBackgroundColor(),
-          borderColor: getBorderColor(),
-          borderWidth: variant === 'ghost' ? 0 : 1,
-          opacity: disabled ? 0.4 : 1,
-        },
-        style,
-      ]}
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.7}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      testID={testID}
-    >
-      {typeof icon === 'string' ? (
-        <Text style={[styles.iconText, { fontSize: size === 'lg' ? 22 : size === 'sm' ? 16 : 18 }]}>
-          {icon}
-        </Text>
-      ) : (
-        icon
-      )}
+    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, style]}>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          {
+            width: dim,
+            height: dim,
+            borderRadius: 10,
+            backgroundColor: getBackgroundColor(),
+            borderColor: getBorderColor(),
+            borderWidth: variant === 'ghost' ? 0 : 1,
+            opacity: disabled ? 0.4 : 1,
+          },
+        ]}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={disabled}
+        activeOpacity={0.8}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="button"
+        testID={testID}
+      >
+        {typeof icon === 'string' ? (
+          icon.length > 2 || icon.match(/^[a-z\-]+$/i) ? (
+            <Icon name={icon} size={iconSize} color={getIconColor()} />
+          ) : (
+            <Text style={[styles.iconText, { fontSize: iconSize, color: getIconColor() }]}>
+              {icon}
+            </Text>
+          )
+        ) : (
+          icon
+        )}
 
-      {badgeCount !== undefined && badgeCount > 0 && (
-        <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
-          <Text style={styles.badgeText}>
-            {badgeCount > 99 ? '99+' : badgeCount}
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
+        {badgeCount !== undefined && badgeCount > 0 && (
+          <View style={[styles.badge, { backgroundColor: theme.colors.agentInbox }]}>
+            <Text style={[styles.badgeText, { color: theme.colors.textInverse }]}>
+              {badgeCount > 99 ? '99+' : badgeCount}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -124,9 +145,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: {
-    color: '#ffffff',
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '800',
   },
 });
-

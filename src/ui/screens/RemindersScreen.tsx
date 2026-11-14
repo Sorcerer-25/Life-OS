@@ -1,14 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScalePressable } from '../components/core/Motion';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { CalendarAgent } from '../../calendar/calendarAgent';
-import { CalendarMappingRecord } from '../../calendar/mappingRepository';
+
 import { CalendarEventRecord } from '../../calendar/types';
 import { NotificationInboxItem } from '../../models/NotificationEvent';
 import { NotificationProcessor } from '../../notifications/notificationProcessor';
@@ -16,10 +10,11 @@ import { useTheme } from '../theme';
 import { AppHeader } from '../components/core/AppHeader';
 import { ConfirmationDialog } from '../components/core/ConfirmationDialog';
 import { EmptyState } from '../components/core/EmptyState';
+import { Icon } from '../components/core/Icon';
 import { LoadingState } from '../components/core/LoadingState';
-import { PrimaryButton } from '../components/core/PrimaryButton';
+
 import { ScreenContainer } from '../components/core/ScreenContainer';
-import { SectionHeader } from '../components/core/SectionHeader';
+
 import { StatusBadge } from '../components/core/StatusBadge';
 
 interface RemindersScreenProps {
@@ -53,7 +48,7 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
   onClose,
   isModal = false,
 }) => {
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   const [reminders, setReminders] = useState<UnifiedReminderItem[]>([]);
@@ -61,7 +56,7 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
   const [itemToDelete, setItemToDelete] = useState<UnifiedReminderItem | null>(null);
   const [isCanceling, setIsCanceling] = useState<boolean>(false);
 
-  const loadAllReminders = async () => {
+  const loadAllReminders = useCallback(async () => {
     setIsLoading(true);
     try {
       const unified: UnifiedReminderItem[] = [];
@@ -133,11 +128,13 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [calendarAgent, processor]);
 
   useEffect(() => {
-    loadAllReminders();
-  }, []);
+    let cancelled = false;
+    void Promise.resolve().then(() => { if (!cancelled) return loadAllReminders(); });
+    return () => { cancelled = true; };
+  }, [loadAllReminders]);
 
   const handleCancelReminder = async () => {
     if (!itemToDelete) return;
@@ -214,13 +211,10 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
         title="Reminders"
         subtitle="Chronological reminders & tasks organized by day"
         showStatusIndicator
-        statusLabel="Deterministic Engine"
-        onToggleTheme={toggleTheme}
-        onOpenInbox={onOpenInbox}
+        statusLabel="Offline"
         rightAction={
           isModal && onClose ? (
-            <TouchableOpacity
-              onPress={onClose}
+            <ScalePressable onPress={onClose}
               style={{
                 width: 36,
                 height: 36,
@@ -235,7 +229,7 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
               accessibilityLabel="Close"
             >
               <Text style={{ color: theme.colors.textPrimary, fontSize: 16 }}>✕</Text>
-            </TouchableOpacity>
+            </ScalePressable>
           ) : undefined
         }
       />
@@ -253,11 +247,10 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
           },
         ]}
       >
-        <TouchableOpacity
-          style={[
+        <ScalePressable style={[
             styles.segmentBtn,
             activeTab === 'upcoming' && {
-              backgroundColor: theme.colors.primary,
+              backgroundColor: theme.colors.info,
               borderRadius: theme.radii.pill,
             },
           ]}
@@ -277,13 +270,12 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
           >
             Upcoming ({reminders.filter((r) => !r.isPast).length})
           </Text>
-        </TouchableOpacity>
+        </ScalePressable>
 
-        <TouchableOpacity
-          style={[
+        <ScalePressable style={[
             styles.segmentBtn,
             activeTab === 'past' && {
-              backgroundColor: theme.colors.primary,
+              backgroundColor: theme.colors.info,
               borderRadius: theme.radii.pill,
             },
           ]}
@@ -303,43 +295,49 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
           >
             Past / Completed ({reminders.filter((r) => r.isPast).length})
           </Text>
-        </TouchableOpacity>
+        </ScalePressable>
       </View>
 
       {/* Refresh Button */}
       <View style={styles.actionRow}>
-        <TouchableOpacity
-          style={[
+        <ScalePressable style={[
             styles.refreshPill,
             {
               backgroundColor: theme.colors.surface,
               borderColor: theme.colors.border,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
             },
           ]}
           onPress={loadAllReminders}
           activeOpacity={0.7}
         >
-          <Text style={[styles.refreshText, { color: theme.colors.primaryLight }]}>
-            🔄 Refresh
+          <Icon name="refresh-cw" size={18} color={theme.colors.info} />
+          <Text style={[styles.refreshText, { color: theme.colors.info }]}>
+            Refresh
           </Text>
-        </TouchableOpacity>
+        </ScalePressable>
 
         {onNavigateToInput && (
-          <TouchableOpacity
-            style={[
+          <ScalePressable style={[
               styles.refreshPill,
               {
                 backgroundColor: theme.colors.surface,
                 borderColor: theme.colors.border,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
               },
             ]}
             onPress={() => onNavigateToInput()}
             activeOpacity={0.7}
           >
-            <Text style={[styles.refreshText, { color: theme.colors.accent }]}>
-              + New Reminder
+            <Icon name="plus" size={18} color={theme.colors.info} />
+            <Text style={[styles.refreshText, { color: theme.colors.info }]}>
+              New Reminder
             </Text>
-          </TouchableOpacity>
+          </ScalePressable>
         )}
       </View>
 
@@ -348,7 +346,7 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
         <LoadingState message="Loading reminders from local database..." />
       ) : groupKeys.length === 0 ? (
         <EmptyState
-          icon="🔔"
+          icon="bell"
           title={activeTab === 'upcoming' ? 'No Upcoming Reminders' : 'No Past Reminders'}
           description={
             activeTab === 'upcoming'
@@ -364,9 +362,12 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
             <View key={dayLabel} style={styles.dayGroup}>
               {/* Day Header */}
               <View style={styles.dayHeaderRow}>
-                <Text style={[theme.typography.titleSmall, { color: theme.colors.primaryLight }]}>
-                  📅 {dayLabel}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Icon name="calendar" size={18} color={theme.colors.agentCalendar} />
+                  <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
+                    {dayLabel}
+                  </Text>
+                </View>
                 <View
                   style={[
                     styles.dayCountBadge,
@@ -409,7 +410,7 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
                             { color: theme.colors.textSecondary, marginTop: 2 },
                           ]}
                         >
-                          Source: {item.source} • {item.time ? `⏰ ${item.time}` : 'All Day'}
+                          Source: {item.source} • {item.time ? ` ${item.time}` : 'All Day'}
                         </Text>
                       </View>
 
@@ -419,8 +420,7 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
                     {/* Actions: Cancel */}
                     {item.status !== 'dismissed' && item.status !== 'deleted' && (
                       <View style={[styles.reminderActionRow, { marginTop: theme.spacing.sm }]}>
-                        <TouchableOpacity
-                          style={[
+                        <ScalePressable style={[
                             styles.cancelBtn,
                             {
                               backgroundColor: theme.colors.errorSurface,
@@ -433,7 +433,7 @@ export const RemindersScreen: React.FC<RemindersScreenProps> = ({
                           <Text style={[styles.cancelBtnText, { color: theme.colors.errorForeground }]}>
                             ✕ Cancel
                           </Text>
-                        </TouchableOpacity>
+                        </ScalePressable>
                       </View>
                     )}
                   </View>
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   refreshText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   dayGroup: {
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   cancelBtnText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
 });

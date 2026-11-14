@@ -1,3 +1,6 @@
+import { ScalePressable } from './core/Motion';
+import { Theme, useTheme } from '../theme';
+import { IconTile } from './core/IconTile';
 import React, { useState } from 'react';
 import {
   Modal,
@@ -5,9 +8,9 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
-  View,
+    View,
 } from 'react-native';
+import { Icon } from './core/Icon';
 import {
   NotificationEvent,
 } from '../../models/NotificationEvent';
@@ -36,6 +39,8 @@ export const SimulatedNotificationModal: React.FC<SimulatedNotificationModalProp
   processor,
   onNotificationProcessed,
 }) => {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const [samples] = useState<SimulatedSampleNotification[]>(getSimulatedNotificationSamples());
   const [activeTab, setActiveTab] = useState<'presets' | 'custom'>('presets');
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'warning' | 'error' } | null>(null);
@@ -54,23 +59,23 @@ export const SimulatedNotificationModal: React.FC<SimulatedNotificationModalProp
 
       if (result.accepted) {
         setStatusMessage({
-          text: `✓ Accepted: "${event.title}" saved to SQLite inbox as 'new'. User approval required before execution.`,
+          text: `“${event.title}” is ready to review in Inbox.`,
           type: 'success',
         });
       } else {
         if (result.reason === 'app_not_allowed') {
           setStatusMessage({
-            text: `⚠️ Dropped immediately: App "${event.source_app}" is NOT in user allow-list. Never stored in SQLite.`,
+            text: ` Dropped immediately: App "${event.source_app}" is NOT in user allow-list. Never stored in SQLite.`,
             type: 'warning',
           });
         } else if (result.reason === 'duplicate_notification') {
           setStatusMessage({
-            text: `ℹ️ De-duplicated: Identical notification was already received within the 15-minute time window.`,
+            text: ` De-duplicated: Identical notification was already received within the 15-minute time window.`,
             type: 'warning',
           });
         } else {
           setStatusMessage({
-            text: `⚠️ Dropped by pre-filter: ${result.reason}`,
+            text: ` Dropped by pre-filter: ${result.reason}`,
             type: 'warning',
           });
         }
@@ -110,24 +115,23 @@ export const SimulatedNotificationModal: React.FC<SimulatedNotificationModalProp
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.headerRow}>
             <View>
               <Text style={styles.title}>Simulate Notification</Text>
-              <Text style={styles.subtitle}>Test incoming alerts via the shared notification pipeline</Text>
+              <Text style={styles.subtitle}>Try a sample alert before connecting your apps.</Text>
             </View>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
+            <ScalePressable style={styles.closeButton} onPress={onClose}>
+              <Icon name="x" color={theme.colors.textPrimary} />
+            </ScalePressable>
           </View>
 
           {/* Tabs */}
           <View style={styles.tabsRow}>
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'presets' && styles.tabButtonActive]}
+            <ScalePressable style={[styles.tabButton, activeTab === 'presets' && styles.tabButtonActive]}
               onPress={() => {
                 setActiveTab('presets');
                 setStatusMessage(null);
@@ -136,9 +140,8 @@ export const SimulatedNotificationModal: React.FC<SimulatedNotificationModalProp
               <Text style={[styles.tabText, activeTab === 'presets' && styles.tabTextActive]}>
                 Presets ({samples.length})
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'custom' && styles.tabButtonActive]}
+            </ScalePressable>
+            <ScalePressable style={[styles.tabButton, activeTab === 'custom' && styles.tabButtonActive]}
               onPress={() => {
                 setActiveTab('custom');
                 setStatusMessage(null);
@@ -147,7 +150,7 @@ export const SimulatedNotificationModal: React.FC<SimulatedNotificationModalProp
               <Text style={[styles.tabText, activeTab === 'custom' && styles.tabTextActive]}>
                 Custom Alert
               </Text>
-            </TouchableOpacity>
+            </ScalePressable>
           </View>
 
           {/* Status Feedback Notice */}
@@ -171,15 +174,14 @@ export const SimulatedNotificationModal: React.FC<SimulatedNotificationModalProp
                 {statusMessage.text}
               </Text>
               {statusMessage.type === 'success' && (
-                <TouchableOpacity
-                  style={styles.openInboxFeedbackBtn}
+                <ScalePressable style={styles.openInboxFeedbackBtn}
                   onPress={() => {
                     onClose();
                     onOpenInbox();
                   }}
                 >
                   <Text style={styles.openInboxFeedbackBtnText}>Open in Inbox →</Text>
-                </TouchableOpacity>
+                </ScalePressable>
               )}
             </View>
           )}
@@ -216,29 +218,33 @@ export const SimulatedNotificationModal: React.FC<SimulatedNotificationModalProp
                       </View>
 
                       <View style={styles.sampleContentBox}>
-                        <Text style={styles.sampleNotifTitle}>🔔 {sample.event.title}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <IconTile agent="inbox" />
+                          <Text style={styles.sampleNotifTitle}>{sample.event.title}</Text>
+                        </View>
                         <Text style={styles.sampleNotifBody}>{sample.event.text}</Text>
                       </View>
 
-                      <Text style={styles.sampleDesc}>💡 {sample.description}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 4 }}>
+                        <Icon name="info" size={18} color={theme.colors.textSecondary} />
+                        <Text style={styles.sampleDesc}>{sample.description}</Text>
+                      </View>
 
                       <View style={styles.cardActionsRow}>
                         {!allowed && (
-                          <TouchableOpacity
-                            style={styles.allowButton}
+                          <ScalePressable style={styles.allowButton}
                             onPress={() => handleAllowAndSimulate(sample)}
                           >
                             <Text style={styles.allowButtonText}>+ Allow App & Send</Text>
-                          </TouchableOpacity>
+                          </ScalePressable>
                         )}
-                        <TouchableOpacity
-                          style={[styles.sendButton, !allowed && styles.sendButtonBlocked]}
+                        <ScalePressable style={[styles.sendButton, !allowed && styles.sendButtonBlocked]}
                           onPress={() => handleSimulate(sample.event)}
                         >
                           <Text style={styles.sendButtonText}>
-                            {allowed ? '⚡ Simulate Notification' : 'Simulate (Will Drop)'}
+                            {allowed ? ' Simulate Notification' : 'Simulate (Will Drop)'}
                           </Text>
-                        </TouchableOpacity>
+                        </ScalePressable>
                       </View>
                     </View>
                   );
@@ -252,7 +258,7 @@ export const SimulatedNotificationModal: React.FC<SimulatedNotificationModalProp
                   value={customPkg}
                   onChangeText={setCustomPkg}
                   placeholder="e.g. com.google.android.calendar"
-                  placeholderTextColor="#64748b"
+                  placeholderTextColor={theme.colors.textSecondary}
                   autoCapitalize="none"
                 />
 
@@ -262,7 +268,7 @@ export const SimulatedNotificationModal: React.FC<SimulatedNotificationModalProp
                   value={customLabel}
                   onChangeText={setCustomLabel}
                   placeholder="e.g. Calendar"
-                  placeholderTextColor="#64748b"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
 
                 <Text style={styles.fieldLabel}>Notification Title:</Text>
@@ -271,7 +277,7 @@ export const SimulatedNotificationModal: React.FC<SimulatedNotificationModalProp
                   value={customTitle}
                   onChangeText={setCustomTitle}
                   placeholder="e.g. Meeting Invitation"
-                  placeholderTextColor="#64748b"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
 
                 <Text style={styles.fieldLabel}>Notification Body Text:</Text>
@@ -282,46 +288,48 @@ export const SimulatedNotificationModal: React.FC<SimulatedNotificationModalProp
                   multiline
                   numberOfLines={3}
                   placeholder="e.g. Sync with team tomorrow at 3 PM"
-                  placeholderTextColor="#64748b"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
 
-                <TouchableOpacity style={styles.simulateCustomBtn} onPress={handleSimulateCustom}>
-                  <Text style={styles.simulateCustomBtnText}>⚡ Simulate Custom Notification</Text>
-                </TouchableOpacity>
+                <ScalePressable style={styles.simulateCustomBtn} onPress={handleSimulateCustom}>
+                  <Text style={styles.simulateCustomBtnText}> Simulate Custom Notification</Text>
+                </ScalePressable>
               </View>
             )}
           </ScrollView>
 
           {/* Footer View Inbox Button */}
-          <TouchableOpacity
-            style={styles.footerInboxBtn}
+          <ScalePressable style={styles.footerInboxBtn}
             onPress={() => {
               onClose();
               onOpenInbox();
             }}
           >
-            <Text style={styles.footerInboxBtnText}>📥 Go to Notification Inbox</Text>
-          </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Icon name="inbox" size={18} color={theme.colors.textPrimary} />
+              <Text style={styles.footerInboxBtnText}>Go to Notification Inbox</Text>
+            </View>
+          </ScalePressable>
         </View>
       </View>
     </Modal>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#090d16',
+    backgroundColor: theme.colors.background,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     maxHeight: '92%',
     padding: 16,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: theme.colors.border,
   },
   headerRow: {
     flexDirection: 'row',
@@ -330,36 +338,36 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   title: {
-    color: '#f8fafc',
+    color: theme.colors.textPrimary,
     fontSize: 18,
     fontWeight: '800',
   },
   subtitle: {
-    color: '#94a3b8',
-    fontSize: 11,
+    color: theme.colors.textSecondary,
+    fontSize: 15,
     marginTop: 2,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#1e293b',
+    backgroundColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeButtonText: {
-    color: '#cbd5e1',
+    color: theme.colors.textPrimary,
     fontSize: 14,
     fontWeight: '700',
   },
   tabsRow: {
     flexDirection: 'row',
-    backgroundColor: '#020617',
+    backgroundColor: theme.colors.background,
     borderRadius: 8,
     padding: 3,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: theme.colors.border,
   },
   tabButton: {
     flex: 1,
@@ -368,15 +376,15 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   tabButtonActive: {
-    backgroundColor: '#1e293b',
+    backgroundColor: theme.colors.border,
   },
   tabText: {
-    color: '#94a3b8',
-    fontSize: 12,
+    color: theme.colors.textSecondary,
+    fontSize: 13,
     fontWeight: '600',
   },
   tabTextActive: {
-    color: '#38bdf8',
+    color: theme.colors.info,
     fontWeight: '700',
   },
   feedbackBox: {
@@ -386,29 +394,29 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
   },
   feedbackSuccess: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderLeftColor: '#10b981',
+    backgroundColor: theme.colors.surface,
+    borderLeftColor: theme.colors.success,
   },
   feedbackWarning: {
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    borderLeftColor: '#f59e0b',
+    backgroundColor: theme.colors.surface,
+    borderLeftColor: theme.colors.warning,
   },
   feedbackError: {
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    borderLeftColor: '#ef4444',
+    backgroundColor: theme.colors.surface,
+    borderLeftColor: theme.colors.error,
   },
   feedbackText: {
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 22,
   },
   feedbackTextSuccess: {
-    color: '#34d399',
+    color: theme.colors.success,
   },
   feedbackTextWarning: {
-    color: '#fcd34d',
+    color: theme.colors.warning,
   },
   feedbackTextError: {
-    color: '#fca5a5',
+    color: theme.colors.error,
   },
   openInboxFeedbackBtn: {
     alignSelf: 'flex-start',
@@ -416,11 +424,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: 8,
     borderRadius: 4,
-    backgroundColor: '#10b981',
+    backgroundColor: theme.colors.success,
   },
   openInboxFeedbackBtnText: {
-    color: '#0f172a',
-    fontSize: 10,
+    color: theme.colors.textInverse,
+    fontSize: 13,
     fontWeight: '700',
   },
   scrollArea: {
@@ -430,11 +438,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sampleCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: theme.colors.border,
   },
   sampleHeader: {
     flexDirection: 'row',
@@ -447,13 +455,13 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   sampleName: {
-    color: '#f8fafc',
+    color: theme.colors.textPrimary,
     fontSize: 13,
     fontWeight: '700',
   },
   samplePkg: {
-    color: '#64748b',
-    fontSize: 10,
+    color: theme.colors.textSecondary,
+    fontSize: 13,
     marginTop: 1,
   },
   allowBadge: {
@@ -462,123 +470,124 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   allowBadgeAllowed: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: 'transparent',
   },
   allowBadgeBlocked: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    backgroundColor: 'transparent',
   },
   allowBadgeText: {
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '800',
   },
   allowBadgeTextAllowed: {
-    color: '#34d399',
+    color: theme.colors.success,
   },
   allowBadgeTextBlocked: {
-    color: '#f87171',
+    color: theme.colors.error,
   },
   sampleContentBox: {
-    backgroundColor: '#020617',
+    backgroundColor: theme.colors.background,
     borderRadius: 6,
     padding: 8,
     marginVertical: 6,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: theme.colors.border,
   },
   sampleNotifTitle: {
-    color: '#38bdf8',
-    fontSize: 11,
+    color: theme.colors.info,
+    fontSize: 13,
     fontWeight: '700',
     marginBottom: 2,
   },
   sampleNotifBody: {
-    color: '#cbd5e1',
-    fontSize: 11,
-    lineHeight: 15,
+    color: theme.colors.textPrimary,
+    fontSize: 13,
+    lineHeight: 22,
   },
   sampleDesc: {
-    color: '#94a3b8',
-    fontSize: 10,
+    color: theme.colors.textSecondary,
+    fontSize: 13,
     fontStyle: 'italic',
     marginBottom: 8,
   },
   cardActionsRow: {
+    flexWrap: 'wrap',
     flexDirection: 'row',
     gap: 6,
     justifyContent: 'flex-end',
   },
   allowButton: {
-    backgroundColor: '#1e293b',
+    backgroundColor: theme.colors.border,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#0284c7',
+    borderColor: theme.colors.surfaceElevated,
   },
   allowButtonText: {
-    color: '#38bdf8',
-    fontSize: 11,
+    color: theme.colors.info,
+    fontSize: 13,
     fontWeight: '700',
   },
   sendButton: {
-    backgroundColor: '#0284c7',
+    backgroundColor: theme.colors.surfaceElevated,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 6,
   },
   sendButtonBlocked: {
-    backgroundColor: '#334155',
+    backgroundColor: theme.colors.border,
   },
   sendButtonText: {
-    color: '#f8fafc',
-    fontSize: 11,
+    color: theme.colors.textPrimary,
+    fontSize: 13,
     fontWeight: '700',
   },
   customContainer: {
     gap: 8,
   },
   fieldLabel: {
-    color: '#94a3b8',
-    fontSize: 11,
+    color: theme.colors.textSecondary,
+    fontSize: 13,
     fontWeight: '600',
     marginTop: 4,
   },
   inputField: {
-    backgroundColor: '#020617',
+    backgroundColor: theme.colors.background,
     borderRadius: 6,
     padding: 10,
-    color: '#f8fafc',
-    fontSize: 12,
+    color: theme.colors.textPrimary,
+    fontSize: 13,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: theme.colors.border,
   },
   textArea: {
     minHeight: 70,
     textAlignVertical: 'top',
   },
   simulateCustomBtn: {
-    backgroundColor: '#38bdf8',
+    backgroundColor: theme.colors.primary,
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
   },
   simulateCustomBtnText: {
-    color: '#0f172a',
+    color: theme.colors.primaryForeground,
     fontSize: 13,
     fontWeight: '800',
   },
   footerInboxBtn: {
-    backgroundColor: '#1e293b',
+    backgroundColor: theme.colors.border,
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: theme.colors.border,
   },
   footerInboxBtnText: {
-    color: '#cbd5e1',
-    fontSize: 12,
+    color: theme.colors.textPrimary,
+    fontSize: 13,
     fontWeight: '700',
   },
 });

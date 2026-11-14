@@ -1,29 +1,22 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  LayoutAnimation,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  UIManager,
-  View,
-} from 'react-native';
+import { ScalePressable, animateLayout, Entrance } from '../components/core/Motion';
+import { actionDate, humanLabel, agentType as resolveAgent } from '../presentation';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, UIManager, View } from 'react-native';
 import { CalendarAgent } from '../../calendar/calendarAgent';
-import { CalendarMappingRecord } from '../../calendar/mappingRepository';
-import { CalendarEventRecord } from '../../calendar/types';
+
+
 import { NotificationInboxItem } from '../../models/NotificationEvent';
 import { NotificationProcessor } from '../../notifications/notificationProcessor';
 import { useTheme } from '../theme';
 import { BottomSheet } from '../components/core/BottomSheet';
 import { EmptyState } from '../components/core/EmptyState';
+import { Icon } from '../components/core/Icon';
+import { AgentType, IconTile } from '../components/core/IconTile';
 import { LoadingState } from '../components/core/LoadingState';
-import { PrimaryButton } from '../components/core/PrimaryButton';
+
 import { ScreenContainer } from '../components/core/ScreenContainer';
 import { SecondaryButton } from '../components/core/SecondaryButton';
-import { SectionHeader } from '../components/core/SectionHeader';
+
 import { StatusBadge } from '../components/core/StatusBadge';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -38,6 +31,7 @@ export interface UnifiedActivityItem {
   sourceApp?: string;
   title: string;
   description?: string;
+  scheduledAt?: string;
   timestamp: string;
   status: string;
   intents?: string[];
@@ -65,7 +59,7 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
   onClose,
   isModal = false,
 }) => {
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
   const [activities, setActivities] = useState<UnifiedActivityItem[]>([]);
   const [filter, setFilter] = useState<ActivityFilter>('all');
@@ -80,7 +74,7 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
   const [selectedItem, setSelectedItem] = useState<UnifiedActivityItem | null>(null);
   const [showJsonInspector, setShowJsonInspector] = useState<boolean>(false);
 
-  const loadActivities = async () => {
+  const loadActivities = useCallback(async () => {
     try {
       // 1. Fetch notification inbox history
       const notifRepo = processor.getRepository();
@@ -98,6 +92,7 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
           sourceType: 'notification',
           sourceApp: n.app_label || n.source_app,
           title: n.title,
+          scheduledAt: actionDate((n.action_plan?.actions[0]?.data || {}) as Record<string, unknown>),
           description: n.text,
           timestamp: n.posted_at || n.created_at,
           status: n.status,
@@ -119,7 +114,8 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
           id: `cal_${m.action_id}`,
           sourceType: 'calendar',
           sourceApp: 'Android CalendarProvider',
-          title: ev?.title || `Calendar Action: ${m.action_id}`,
+          title: ev?.title || 'Calendar event',
+          scheduledAt: ev ? new Date(ev.startDate).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : undefined,
           description: ev
             ? `Scheduled for ${new Date(ev.startDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}${ev.location ? ` at ${ev.location}` : ''}`
             : `Event ID: ${m.android_event_id || 'none'}`,
@@ -147,11 +143,13 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [processor, calendarAgent]);
 
   useEffect(() => {
-    loadActivities();
-  }, []);
+    let cancelled = false;
+    void Promise.resolve().then(() => { if (!cancelled) return loadActivities(); });
+    return () => { cancelled = true; };
+  }, [loadActivities]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -159,7 +157,7 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
   };
 
   const toggleErrorExpand = (id: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    animateLayout();
     setExpandedErrorIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
@@ -252,18 +250,37 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
     return c;
   }, [activities]);
 
-  const getSourceIcon = (sourceType: string) => {
-    switch (sourceType) {
-      case 'voice':
-        return '🎤';
-      case 'calendar':
-        return '🗓️';
-      case 'notification':
-        return '🔔';
-      case 'text':
-      default:
-        return '⌨️';
+  const getAgentType = (item: UnifiedActivityItem): AgentType => {
+    const ag = item.agents?.[0]?.toLowerCase() || '';
+    if (ag.includes('calendar')) return 'calendar';
+    if (ag.includes('reminder')) return 'reminder';
+    if (ag.includes('task')) return 'task';
+    const int = item.intents?.[0]?.toLowerCase() || '';
+    if (int.includes('calendar') || int.includes('event')) return 'calendar';
+    if (int.includes('reminder')) return 'reminder';
+    if (int.includes('task')) return 'task';
+    if (int.includes('expense')) return 'expense';
+    if (item.sourceType === 'calendar') return 'calendar';
+    if (item.sourceType === 'voice') return 'system';
+    return 'inbox';
+  };
+
+  const getActionHeadline = (item: UnifiedActivityItem): string => {
+    const firstAgent = item.agents?.[0]?.toLowerCase() || '';
+    const firstIntent = item.intents?.[0]?.toLowerCase() || '';
+    if (firstAgent.includes('calendar') || firstIntent.includes('calendar') || item.sourceType === 'calendar') {
+      return [item.status === 'failed' ? 'Calendar action failed' : item.status === 'actioned' ? 'Calendar event added' : item.status === 'deleted' ? 'Calendar event removed' : 'Calendar event planned', item.scheduledAt].filter(Boolean).join(' · ');
     }
+    if (firstAgent.includes('reminder') || firstIntent.includes('reminder')) {
+      return ['Reminder plan', item.scheduledAt].filter(Boolean).join(' · ');
+    }
+    if (firstAgent.includes('task') || firstIntent.includes('task')) {
+      return ['Task plan', item.scheduledAt].filter(Boolean).join(' · ');
+    }
+    if (firstIntent.includes('expense')) {
+      return 'Expense review';
+    }
+    return item.sourceType === 'notification' ? 'Notification received' : 'Request reviewed';
   };
 
   const getSourceLabel = (item: UnifiedActivityItem) => {
@@ -293,23 +310,14 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
           </Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={[styles.headerActionBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-            onPress={toggleTheme}
-            activeOpacity={0.7}
-            accessibilityLabel="Toggle Theme"
-          >
-            <Text style={styles.headerActionIcon}>{theme.isDark ? '☀️' : '🌙'}</Text>
-          </TouchableOpacity>
           {isModal && onClose && (
-            <TouchableOpacity
-              style={[styles.headerActionBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+            <ScalePressable style={[styles.headerActionBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
               onPress={onClose}
               activeOpacity={0.7}
               accessibilityLabel="Close"
             >
-              <Text style={styles.headerActionIcon}>✕</Text>
-            </TouchableOpacity>
+              <Icon name="x" size={18} color={theme.colors.textPrimary} />
+            </ScalePressable>
           )}
         </View>
       </View>
@@ -327,13 +335,12 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
           ).map((tab) => {
             const isActive = filter === tab.key;
             return (
-              <TouchableOpacity
-                key={tab.key}
+              <ScalePressable key={tab.key}
                 style={[
                   styles.filterTab,
                   {
-                    backgroundColor: isActive ? theme.colors.primaryLight : theme.colors.surface,
-                    borderColor: isActive ? theme.colors.primaryLight : theme.colors.border,
+                    backgroundColor: isActive ? theme.colors.surfaceSubtle : theme.colors.surface,
+                    borderColor: isActive ? theme.colors.info : theme.colors.border,
                   },
                 ]}
                 onPress={() => setFilter(tab.key)}
@@ -343,7 +350,7 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                   style={[
                     styles.filterTabLabel,
                     {
-                      color: isActive ? theme.colors.primaryDark : theme.colors.textPrimary,
+                      color: isActive ? theme.colors.textPrimary : theme.colors.textSecondary,
                       fontWeight: isActive ? '700' : '500',
                     },
                   ]}
@@ -354,20 +361,20 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                   style={[
                     styles.filterBadge,
                     {
-                      backgroundColor: isActive ? theme.colors.primaryDark : theme.colors.surfaceSubtle,
+                      backgroundColor: theme.colors.surfaceSubtle,
                     },
                   ]}
                 >
                   <Text
                     style={[
                       styles.filterBadgeText,
-                      { color: isActive ? theme.colors.primaryLight : theme.colors.textSecondary },
+                      { color: isActive ? theme.colors.textPrimary : theme.colors.textSecondary },
                     ]}
                   >
                     {tab.count}
                   </Text>
                 </View>
-              </TouchableOpacity>
+              </ScalePressable>
             );
           })}
         </ScrollView>
@@ -384,7 +391,7 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
           },
         ]}
       >
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Icon name="search" size={18} color={theme.colors.textSecondary} style={{ marginRight: 8 }} />
         <TextInput
           style={[styles.searchInput, { color: theme.colors.textPrimary }]}
           placeholder="Filter by title, intent, agent or app..."
@@ -394,9 +401,9 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
           clearButtonMode="while-editing"
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={[styles.clearSearchIcon, { color: theme.colors.textTertiary }]}>✕</Text>
-          </TouchableOpacity>
+          <ScalePressable onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="x" size={18} color={theme.colors.textSecondary} />
+          </ScalePressable>
         )}
       </View>
 
@@ -405,7 +412,7 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
         <LoadingState message="Loading activity history..." style={{ marginTop: 40 }} />
       ) : filteredActivities.length === 0 ? (
         <EmptyState
-          icon={filter === 'failed' ? '🛡️' : '⏱️'}
+          icon={filter === 'failed' ? 'shield' : 'clock'}
           title={
             searchQuery.trim()
               ? 'No Matching Activities'
@@ -441,8 +448,8 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              colors={[theme.colors.primaryLight]}
-              tintColor={theme.colors.primaryLight}
+              colors={[theme.colors.textPrimary]}
+              tintColor={theme.colors.textPrimary}
             />
           }
         >
@@ -465,32 +472,21 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
               }
             })();
 
+            const actionHeadline = getActionHeadline(act);
+            const sublineText = actionHeadline !== act.title ? act.title : (act.description || '');
+
             return (
-              <View key={act.id} style={styles.timelineRow}>
+              <Entrance key={act.id} index={index}><View style={styles.timelineRow}>
                 {/* Timeline vertical connector */}
                 <View style={styles.timelineRail}>
-                  <View
-                    style={[
-                      styles.timelineNode,
-                      {
-                        backgroundColor: isFailure
-                          ? theme.colors.error
-                          : act.status === 'actioned' || act.status === 'created'
-                          ? theme.colors.success
-                          : theme.colors.primaryLight,
-                      },
-                    ]}
-                  >
-                    <Text style={styles.timelineNodeIcon}>{getSourceIcon(act.sourceType)}</Text>
-                  </View>
+                  <IconTile agent={getAgentType(act)} size={30} iconSize={18} />
                   {index < filteredActivities.length - 1 && (
                     <View style={[styles.timelineLine, { backgroundColor: theme.colors.borderSubtle }]} />
                   )}
                 </View>
 
                 {/* Timeline card body */}
-                <TouchableOpacity
-                  style={[
+                <ScalePressable style={[
                     styles.activityCard,
                     {
                       backgroundColor: theme.colors.card,
@@ -498,7 +494,6 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                       borderRadius: theme.radii.md,
                       padding: theme.spacing.md,
                     },
-                    theme.shadows.sm,
                   ]}
                   onPress={() => setSelectedItem(act)}
                   activeOpacity={0.7}
@@ -518,20 +513,20 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                     </View>
                   </View>
 
-                  {/* Title & Description */}
+                  {/* Title & Description: Name what happened */}
                   <Text
                     style={[theme.typography.titleSmall, { color: theme.colors.textPrimary, marginTop: theme.spacing.xs }]}
                     numberOfLines={2}
                   >
-                    {act.title}
+                    {actionHeadline}
                   </Text>
 
-                  {act.description ? (
+                  {sublineText ? (
                     <Text
-                      style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 4 }]}
-                      numberOfLines={3}
+                      style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, marginTop: 2, lineHeight: 18 }]}
+                      numberOfLines={2}
                     >
-                      {act.description}
+                      {sublineText}
                     </Text>
                   ) : null}
 
@@ -546,8 +541,9 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                             { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border },
                           ]}
                         >
-                          <Text style={[styles.chipText, { color: theme.colors.primaryLight }]}>
-                            🎯 {intent}
+                          <Icon name="check" size={18} color={theme.colors.success} style={{ marginRight: 4 }} />
+                          <Text style={[styles.chipText, { color: theme.colors.textPrimary }]}>
+                            {humanLabel(intent)}
                           </Text>
                         </View>
                       ))}
@@ -559,8 +555,9 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                             { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border },
                           ]}
                         >
-                          <Text style={[styles.chipText, { color: theme.colors.accent }]}>
-                            🤖 {agent}
+                          <IconTile agent={resolveAgent(agent)} size={28} style={{ marginRight: 4 }} />
+                          <Text style={[styles.chipText, { color: theme.colors.textPrimary }]}>
+                            {humanLabel(agent)}
                           </Text>
                         </View>
                       ))}
@@ -580,7 +577,7 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                       ]}
                     >
                       <View style={styles.failureHeader}>
-                        <Text style={styles.failureIcon}>⚠️</Text>
+                        <Icon name="alert-triangle" size={18} color={theme.colors.error} style={{ marginRight: 6 }} />
                         <Text style={[theme.typography.titleSmall, { color: theme.colors.error, flex: 1 }]}>
                           {failureInfo.title}
                         </Text>
@@ -597,21 +594,26 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                             { color: theme.colors.warning, marginTop: 4, fontWeight: '600' },
                           ]}
                         >
-                          💡 Tip: {failureInfo.recoveryTip}
+                          Tip: {failureInfo.recoveryTip}
                         </Text>
                       ) : null}
 
                       {/* Expand raw technical error toggle */}
                       {act.rawError && (
-                        <TouchableOpacity
-                          style={styles.expandToggle}
+                        <ScalePressable style={styles.expandToggle}
                           onPress={() => toggleErrorExpand(act.id)}
                           activeOpacity={0.7}
                         >
                           <Text style={[styles.expandToggleText, { color: theme.colors.textTertiary }]}>
-                            {isErrorExpanded ? 'Hide Raw Technical Error ▲' : 'Show Raw Technical Error ▼'}
+                            {isErrorExpanded ? 'Hide Raw Technical Error' : 'Show Raw Technical Error'}
                           </Text>
-                        </TouchableOpacity>
+                          <Icon
+                            name={isErrorExpanded ? 'chevron-up' : 'chevron-down'}
+                            size={18}
+                            color={theme.colors.textTertiary}
+                            style={{ marginLeft: 4 }}
+                          />
+                        </ScalePressable>
                       )}
 
                       {/* Monospace raw error view */}
@@ -636,11 +638,11 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                   {/* Footer prompt */}
                   <View style={styles.cardFooter}>
                     <Text style={[theme.typography.caption, { color: theme.colors.textTertiary }]}>
-                      Tap for pipeline audit details →
+                      Tap for details
                     </Text>
                   </View>
-                </TouchableOpacity>
-              </View>
+                </ScalePressable>
+              </View></Entrance>
             );
           })}
         </ScrollView>
@@ -653,7 +655,7 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
           setSelectedItem(null);
           setShowJsonInspector(false);
         }}
-        title="Activity Audit Details"
+        title="Activity details"
         subtitle={selectedItem ? getSourceLabel(selectedItem) : undefined}
       >
         {selectedItem && (
@@ -665,7 +667,7 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                 { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md },
               ]}
             >
-              <Text style={[theme.typography.titleSmall, { color: theme.colors.primaryLight }]}>
+              <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
                 1. Original Input & Origin
               </Text>
               <Text style={[theme.typography.titleMedium, { color: theme.colors.textPrimary, marginTop: 4 }]}>
@@ -694,16 +696,26 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                   { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md, marginTop: 10 },
                 ]}
               >
-                <Text style={[theme.typography.titleSmall, { color: theme.colors.primaryLight }]}>
+                <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
                   2. Identified Intents
                 </Text>
                 <View style={[styles.badgesRow, { marginTop: 6 }]}>
                   {selectedItem.intents.map((i, idx) => (
                     <View
                       key={idx}
-                      style={[styles.chip, { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border }]}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: theme.colors.surfaceSubtle,
+                          borderColor: theme.colors.border,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                        },
+                      ]}
                     >
-                      <Text style={[styles.chipText, { color: theme.colors.primaryLight }]}>🎯 {i}</Text>
+                      <Icon name="target" size={18} color={theme.colors.textPrimary} />
+                      <Text style={[styles.chipText, { color: theme.colors.textPrimary }]}>{i}</Text>
                     </View>
                   ))}
                 </View>
@@ -718,16 +730,26 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                   { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md, marginTop: 10 },
                 ]}
               >
-                <Text style={[theme.typography.titleSmall, { color: theme.colors.primaryLight }]}>
+                <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
                   3. Assigned Agents & Orchestration
                 </Text>
                 <View style={[styles.badgesRow, { marginTop: 6 }]}>
                   {selectedItem.agents.map((a, idx) => (
                     <View
                       key={idx}
-                      style={[styles.chip, { backgroundColor: theme.colors.surfaceSubtle, borderColor: theme.colors.border }]}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: theme.colors.surfaceSubtle,
+                          borderColor: theme.colors.border,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                        },
+                      ]}
                     >
-                      <Text style={[styles.chipText, { color: theme.colors.accent }]}>🤖 {a}</Text>
+                      <Icon name="cpu" size={18} color={theme.colors.info} />
+                      <Text style={[styles.chipText, { color: theme.colors.info }]}>{a}</Text>
                     </View>
                   ))}
                 </View>
@@ -741,7 +763,7 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
                 { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md, marginTop: 10 },
               ]}
             >
-              <Text style={[theme.typography.titleSmall, { color: theme.colors.primaryLight }]}>
+              <Text style={[theme.typography.titleSmall, { color: theme.colors.textPrimary }]}>
                 4. Outcome & Native Verification
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
@@ -768,23 +790,31 @@ export const ActivityHistoryScreen: React.FC<ActivityHistoryScreenProps> = ({
             </View>
 
             {/* Technical JSON Inspector Toggle */}
-            <TouchableOpacity
-              style={[
+            <ScalePressable style={[
                 styles.jsonToggleBtn,
                 {
                   backgroundColor: theme.colors.surface,
                   borderColor: theme.colors.border,
                   borderRadius: theme.radii.md,
                   marginTop: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
                 },
               ]}
               onPress={() => setShowJsonInspector((prev) => !prev)}
               activeOpacity={0.7}
             >
-              <Text style={[theme.typography.bodySmall, { color: theme.colors.primaryLight, fontWeight: '600' }]}>
-                {showJsonInspector ? 'Hide Technical Audit JSON ▲' : 'Inspect Raw Technical JSON ▼'}
+              <Text style={[theme.typography.bodySmall, { color: theme.colors.textPrimary, fontWeight: '600' }]}>
+                {showJsonInspector ? 'Hide Technical Audit JSON' : 'Inspect Raw Technical JSON'}
               </Text>
-            </TouchableOpacity>
+              <Icon
+                name={showJsonInspector ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color={theme.colors.textPrimary}
+              />
+            </ScalePressable>
 
             {showJsonInspector && (
               <View
@@ -873,7 +903,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   filterTabLabel: {
-    fontSize: 12,
+    fontSize: 13,
   },
   filterBadge: {
     paddingHorizontal: 6,
@@ -881,7 +911,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   filterBadgeText: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '700',
   },
   searchBox: {
@@ -929,7 +959,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   timelineNodeIcon: {
-    fontSize: 12,
+    fontSize: 13,
   },
   timelineLine: {
     width: 2,
@@ -969,7 +999,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipText: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '600',
   },
   failureBox: {
@@ -990,7 +1020,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   expandToggleText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   rawErrorContainer: {
@@ -1001,7 +1031,7 @@ const styles = StyleSheet.create({
   },
   rawErrorText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 10,
+    fontSize: 13,
     lineHeight: 14,
   },
   cardFooter: {
@@ -1027,7 +1057,7 @@ const styles = StyleSheet.create({
   },
   jsonText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 22,
   },
 });

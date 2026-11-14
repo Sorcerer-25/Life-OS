@@ -1,18 +1,13 @@
-import React from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { useReducedMotion } from './Motion';
+import React, { useState } from 'react';
+import { ActivityIndicator, Animated, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { useTheme } from '../../theme';
+import { Icon, IconName } from './Icon';
 
 interface SecondaryButtonProps {
   label: string;
   onPress: () => void;
-  icon?: string | React.ReactNode;
+  icon?: IconName | string | React.ReactNode;
   isLoading?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
@@ -33,6 +28,25 @@ export const SecondaryButton: React.FC<SecondaryButtonProps> = ({
   accessibilityLabel,
 }) => {
   const { theme } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const [scaleAnim] = useState(() => new Animated.Value(1));
+
+  const handlePressIn = () => {
+    if (reducedMotion) return;
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      speed: 24,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 4,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const getPadding = () => {
     switch (size) {
@@ -47,45 +61,50 @@ export const SecondaryButton: React.FC<SecondaryButtonProps> = ({
   };
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.button,
-        getPadding(),
-        {
-          backgroundColor: theme.colors.surfaceSubtle,
-          borderColor: theme.colors.border,
-          borderRadius: theme.radii.md,
-          opacity: disabled ? 0.5 : 1,
-        },
-        style,
-      ]}
-      onPress={onPress}
-      disabled={disabled || isLoading}
-      activeOpacity={0.7}
-      testID={testID}
-      accessibilityLabel={accessibilityLabel || label}
-      accessibilityRole="button"
-    >
-      {isLoading ? (
-        <ActivityIndicator color={theme.colors.textSecondary} size="small" />
-      ) : (
-        <View style={styles.contentRow}>
-          {typeof icon === 'string' ? (
-            <Text style={[styles.iconText, { marginRight: theme.spacing.xs }]}>{icon}</Text>
-          ) : icon ? (
-            <View style={{ marginRight: theme.spacing.xs }}>{icon}</View>
-          ) : null}
-          <Text
-            style={[
-              size === 'sm' ? theme.typography.bodyMedium : theme.typography.titleSmall,
-              { color: theme.colors.textPrimary, fontWeight: '600' },
-            ]}
-          >
-            {label}
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
+    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, style]}>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          getPadding(),
+          {
+            backgroundColor: theme.colors.surfaceSubtle,
+            borderColor: theme.colors.border,
+            borderRadius: theme.radii.md,
+            opacity: disabled ? 0.5 : 1,
+          },
+        ]}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={disabled || isLoading}
+        activeOpacity={0.8}
+        testID={testID}
+        accessibilityLabel={accessibilityLabel || label}
+        accessibilityRole="button"
+      >
+        {isLoading ? (
+          <ActivityIndicator color={theme.colors.textSecondary} size="small" />
+        ) : (
+          <View style={styles.contentRow}>
+            {typeof icon === 'string' ? (
+              <View style={{ marginRight: theme.spacing.xs + 2 }}>
+                <Icon name={icon} size={18} color={theme.colors.textPrimary} />
+              </View>
+            ) : icon ? (
+              <View style={{ marginRight: theme.spacing.xs + 2 }}>{icon}</View>
+            ) : null}
+            <Text
+              style={[
+                size === 'sm' ? theme.typography.bodyMedium : theme.typography.titleSmall,
+                { color: theme.colors.textPrimary, fontWeight: '600' },
+              ]}
+            >
+              {label}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -94,15 +113,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    minHeight: 44, // Accessible touch target
+    minHeight: 44,
   },
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconText: {
-    fontSize: 15,
-  },
 });
-

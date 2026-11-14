@@ -1,5 +1,6 @@
+import { ScalePressable } from './core/Motion';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CalendarAgent } from '../../calendar/calendarAgent';
 import { IdentificationResult } from '../../intent/identifier';
 import { ActionItem, ActionPlan } from '../../models/ActionPlan';
@@ -23,7 +24,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
   const [calendarResults, setCalendarResults] = useState<Record<string, AgentResult>>({});
   const [executingActions, setExecutingActions] = useState<Record<string, boolean>>({});
 
-  const { analysis, method, warning, executionTimeMs } = analysisResult;
+  const { analysis, warning, executionTimeMs } = analysisResult;
 
   const handleExecuteCalendarAction = async (action: ActionItem) => {
     setExecutingActions((prev) => ({ ...prev, [action.action_id]: true }));
@@ -65,26 +66,26 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
       case 'partial':
         return (
           <View style={[styles.statusBadge, styles.statusPartial]}>
-            <Text style={styles.statusBadgeText}>⚡ PARTIAL (MIXED)</Text>
+            <Text style={styles.statusBadgeText}> PARTIAL (MIXED)</Text>
           </View>
         );
       case 'needs_clarification':
         return (
           <View style={[styles.statusBadge, styles.statusClarify]}>
-            <Text style={styles.statusBadgeText}>❓ NEEDS CLARIFICATION</Text>
+            <Text style={styles.statusBadgeText}>NEEDS CLARIFICATION</Text>
           </View>
         );
       case 'unsupported':
         return (
           <View style={[styles.statusBadge, styles.statusUnsupported]}>
-            <Text style={styles.statusBadgeText}>🚫 UNSUPPORTED CAPABILITY</Text>
+            <Text style={styles.statusBadgeText}>UNSUPPORTED CAPABILITY</Text>
           </View>
         );
       case 'rejected':
       default:
         return (
           <View style={[styles.statusBadge, styles.statusRejected]}>
-            <Text style={styles.statusBadgeText}>❌ REJECTED / UNRECOGNIZED</Text>
+            <Text style={styles.statusBadgeText}>REJECTED / UNRECOGNIZED</Text>
           </View>
         );
     }
@@ -96,15 +97,15 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
       {/* STAGE 1: INTENT UNDERSTANDING                             */}
       {/* ───────────────────────────────────────────────────────── */}
       <View style={styles.stageHeader}>
-        <Text style={styles.stageTitle}>Stage 1: Intent Understanding</Text>
+        <Text style={styles.stageTitle}>What LifeOS understood</Text>
         <View style={styles.engineBadge}>
-          <Text style={styles.engineBadgeText}>⚙️ LOCAL RULE-BASED</Text>
+          <Text style={styles.engineBadgeText}>LOCAL RULE-BASED</Text>
         </View>
       </View>
 
       {warning ? (
         <View style={styles.warningBox}>
-          <Text style={styles.warningTitle}>⚠️ Parser Notice:</Text>
+          <Text style={styles.warningTitle}>Please review:</Text>
           <Text style={styles.warningText}>{warning}</Text>
         </View>
       ) : null}
@@ -114,7 +115,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
         <Text style={styles.sectionTitle}>A. Captured Input Event</Text>
         <View style={styles.row}>
           <Text style={styles.fieldLabel}>Raw Input:</Text>
-          <Text style={[styles.fieldValue, styles.rawInputText]}>"{analysis.source.raw_input}"</Text>
+          <Text style={[styles.fieldValue, styles.rawInputText]}>&quot;{analysis.source.raw_input}&quot;</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.fieldLabel}>Source Type:</Text>
@@ -131,10 +132,10 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
             >
               <Text style={styles.sourceTagTextLabel}>
                 {analysis.source.type === 'voice'
-                  ? '🎤 VOICE'
+                  ? 'VOICE'
                   : analysis.source.type === 'notification'
-                  ? '🔔 NOTIFICATION'
-                  : '⌨️ TEXT'}
+                  ? 'NOTIFICATION'
+                  : 'TEXT'}
               </Text>
             </View>
             {analysis.source.source_app ? (
@@ -163,7 +164,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
       {/* B. Unsupported Components (if any) */}
       {analysis.unsupported_components && analysis.unsupported_components.length > 0 && (
         <View style={[styles.card, styles.unsupportedCard]}>
-          <Text style={styles.unsupportedTitle}>🚫 Unsupported Capability Detected</Text>
+          <Text style={styles.unsupportedTitle}>Unsupported Capability Detected</Text>
           {analysis.unsupported_components.map((un, idx) => (
             <View key={idx} style={styles.unsupportedItem}>
               <Text style={styles.unsupportedCapability}>
@@ -178,13 +179,13 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
       {/* C. Unrecognized Input (if any) */}
       {analysis.unrecognized_components && analysis.unrecognized_components.length > 0 && (
         <View style={[styles.card, styles.unrecognizedCard]}>
-          <Text style={styles.unrecognizedTitle}>❓ Unrecognized Input</Text>
+          <Text style={styles.unrecognizedTitle}> Unrecognized Input</Text>
           <Text style={styles.unrecognizedDesc}>
             The system could not identify a supported action for:
           </Text>
           {analysis.unrecognized_components.map((text, idx) => (
             <Text key={idx} style={styles.unrecognizedText}>
-              • "{text}"
+              • &quot;{text}&quot;
             </Text>
           ))}
           <Text style={styles.rephraseTip}>
@@ -199,7 +200,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
           <Text style={styles.sectionTitle}>
             B. Detected Intents ({analysis.intents.length})
           </Text>
-          <Text style={styles.boundaryBadge}>No Agent Mappings in Stage 1</Text>
+          <Text style={styles.boundaryBadge}>Review your request</Text>
         </View>
 
         {analysis.intents.length === 0 ? (
@@ -228,7 +229,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                 {item.raw_segment ? (
                   <View style={styles.segmentRow}>
                     <Text style={styles.segmentLabel}>Clause:</Text>
-                    <Text style={styles.segmentText}>"{item.raw_segment}"</Text>
+                    <Text style={styles.segmentText}>&quot;{item.raw_segment}&quot;</Text>
                   </View>
                 ) : null}
 
@@ -292,14 +293,13 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
       <View style={styles.card}>
         <View style={styles.rowBetween}>
           <Text style={styles.sectionTitle}>IntentAnalysis JSON</Text>
-          <TouchableOpacity
-            style={styles.toggleButton}
+          <ScalePressable style={styles.toggleButton}
             onPress={() => setShowAnalysisJson(!showAnalysisJson)}
           >
             <Text style={styles.toggleButtonText}>
               {showAnalysisJson ? 'Hide JSON ▲' : 'View JSON ▼'}
             </Text>
-          </TouchableOpacity>
+          </ScalePressable>
         </View>
 
         {showAnalysisJson && (
@@ -319,7 +319,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
       {actionPlan && (
         <View style={styles.stageTwoContainer}>
           <View style={styles.stageHeader}>
-            <Text style={styles.stageTitle}>Stage 2: Supervisor Orchestration</Text>
+            <Text style={styles.stageTitle}>Your plan</Text>
             {renderWorkflowStatusBadge(actionPlan.decision.workflow_status)}
           </View>
 
@@ -336,11 +336,11 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
             {actionPlan.decision.clarification_questions.length > 0 && (
               <View style={styles.clarificationBox}>
                 <Text style={styles.clarificationTitle}>
-                  ❓ User Clarification Required:
+                  User Clarification Required:
                 </Text>
                 {actionPlan.decision.clarification_questions.map((q, idx) => (
                   <Text key={idx} style={styles.clarificationQuestion}>
-                    👉 {q}
+                    • {q}
                   </Text>
                 ))}
               </View>
@@ -368,7 +368,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                     <View style={styles.actionBadges}>
                       {act.requires_confirmation && (
                         <View style={styles.confirmBadge}>
-                          <Text style={styles.confirmBadgeText}>⚠️ CONFIRMATION REQ</Text>
+                          <Text style={styles.confirmBadgeText}> CONFIRMATION REQ</Text>
                         </View>
                       )}
                       <View
@@ -420,7 +420,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                   {act.agent === 'calendar_agent' && (
                     <View style={styles.calendarExecBox}>
                       <View style={styles.rowBetween}>
-                        <Text style={styles.calendarExecTitle}>🗓️ Android Calendar Provider</Text>
+                        <Text style={styles.calendarExecTitle}>Android Calendar Provider</Text>
                         {calendarResults[act.action_id] && (
                           <View
                             style={[
@@ -472,15 +472,15 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                               ]}
                             >
                               {calendarResults[act.action_id].output?.verified_in_provider
-                                ? '✓ Verified in native provider'
-                                : '✕ Not verified'}
+                                ? 'Verified in native provider'
+                                : 'Not verified'}
                             </Text>
                           </View>
 
                           {calendarResults[act.action_id].output?.duplicate ? (
                             <View style={styles.duplicateNotice}>
                               <Text style={styles.duplicateNoticeText}>
-                                ⚡ Duplicate request — returned existing device event without re-inserting.
+                                Duplicate request — returned existing device event without re-inserting.
                               </Text>
                             </View>
                           ) : null}
@@ -489,14 +489,13 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                             ?.default_end_time ? (
                             <View style={styles.defaultsNotice}>
                               <Text style={styles.defaultsNoticeText}>
-                                ℹ️ Applied default duration (60 minutes) because end time was not specified.
+                                Applied default duration (60 minutes) because end time was not specified.
                               </Text>
                             </View>
                           ) : null}
                         </View>
                       ) : (
-                        <TouchableOpacity
-                          style={[
+                        <ScalePressable style={[
                             styles.execBtn,
                             executingActions[act.action_id] && styles.execBtnDisabled,
                           ]}
@@ -505,10 +504,10 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                         >
                           <Text style={styles.execBtnText}>
                             {executingActions[act.action_id]
-                              ? '⏳ Inserting into Calendar...'
-                              : '📅 Insert into Device Calendar'}
+                              ? 'Inserting into Calendar...'
+                              : 'Insert into Device Calendar'}
                           </Text>
-                        </TouchableOpacity>
+                        </ScalePressable>
                       )}
                     </View>
                   )}
@@ -521,14 +520,13 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
           <View style={styles.card}>
             <View style={styles.rowBetween}>
               <Text style={styles.sectionTitle}>ActionPlan JSON</Text>
-              <TouchableOpacity
-                style={styles.toggleButton}
+              <ScalePressable style={styles.toggleButton}
                 onPress={() => setShowPlanJson(!showPlanJson)}
               >
                 <Text style={styles.toggleButtonText}>
                   {showPlanJson ? 'Hide Plan JSON ▲' : 'View Plan JSON ▼'}
                 </Text>
-              </TouchableOpacity>
+              </ScalePressable>
             </View>
 
             {showPlanJson && (
@@ -572,7 +570,7 @@ const styles = StyleSheet.create({
   },
   engineBadgeText: {
     color: '#34d399',
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '700',
   },
   warningBox: {
@@ -585,14 +583,14 @@ const styles = StyleSheet.create({
   },
   warningTitle: {
     color: '#fdba74',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     marginBottom: 2,
   },
   warningText: {
     color: '#ffedd5',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 22,
   },
   card: {
     backgroundColor: '#0f172a',
@@ -617,11 +615,11 @@ const styles = StyleSheet.create({
   },
   unsupportedCapability: {
     color: '#fed7aa',
-    fontSize: 12,
+    fontSize: 13,
   },
   unsupportedReason: {
     color: '#fdba74',
-    fontSize: 12,
+    fontSize: 13,
     fontStyle: 'italic',
     marginTop: 2,
   },
@@ -637,17 +635,17 @@ const styles = StyleSheet.create({
   },
   unrecognizedDesc: {
     color: '#fca5a5',
-    fontSize: 12,
+    fontSize: 13,
   },
   unrecognizedText: {
     color: '#fee2e2',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     marginTop: 2,
   },
   rephraseTip: {
     color: '#94a3b8',
-    fontSize: 11,
+    fontSize: 13,
     marginTop: 6,
     fontStyle: 'italic',
   },
@@ -670,20 +668,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   boundaryBadge: {
-    fontSize: 9,
+    fontSize: 13,
     color: '#a78bfa',
     fontWeight: '600',
     textTransform: 'uppercase',
   },
   fieldLabel: {
     width: 120,
-    fontSize: 12,
+    fontSize: 13,
     color: '#94a3b8',
     fontWeight: '600',
   },
   fieldValue: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 13,
     color: '#f8fafc',
   },
   rawInputText: {
@@ -693,7 +691,7 @@ const styles = StyleSheet.create({
   codeText: {
     fontFamily: 'monospace',
     color: '#a5f3fc',
-    fontSize: 11,
+    fontSize: 13,
   },
   intentCard: {
     backgroundColor: '#020617',
@@ -720,7 +718,7 @@ const styles = StyleSheet.create({
   },
   seqText: {
     color: '#f8fafc',
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '700',
   },
   intentBadge: {
@@ -733,7 +731,7 @@ const styles = StyleSheet.create({
   },
   intentBadgeText: {
     color: '#38bdf8',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   confidenceRow: {
@@ -742,12 +740,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   confidenceValue: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     color: '#34d399',
   },
   confidenceNote: {
-    fontSize: 9,
+    fontSize: 13,
     color: '#64748b',
   },
   segmentRow: {
@@ -758,13 +756,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   segmentLabel: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#94a3b8',
     width: 60,
   },
   segmentText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 13,
     color: '#cbd5e1',
     fontStyle: 'italic',
   },
@@ -772,14 +770,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   blockTitle: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '700',
     color: '#94a3b8',
     marginBottom: 3,
     textTransform: 'uppercase',
   },
   emptyText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#64748b',
     fontStyle: 'italic',
   },
@@ -789,13 +787,13 @@ const styles = StyleSheet.create({
   },
   entityKey: {
     width: 110,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
     color: '#cbd5e1',
   },
   entityVal: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 13,
     color: '#f8fafc',
   },
   missingBlock: {
@@ -803,7 +801,7 @@ const styles = StyleSheet.create({
   },
   completeText: {
     color: '#6ee7b7',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   missingList: {
@@ -811,8 +809,8 @@ const styles = StyleSheet.create({
   },
   missingFieldText: {
     color: '#fde68a',
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 22,
   },
   boldMissingField: {
     fontWeight: '700',
@@ -826,7 +824,7 @@ const styles = StyleSheet.create({
   },
   hintText: {
     color: '#cbd5e1',
-    fontSize: 12,
+    fontSize: 13,
   },
   boldText: {
     fontWeight: '700',
@@ -861,13 +859,13 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     color: '#ffffff',
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '700',
   },
   decisionReason: {
     color: '#cbd5e1',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 22,
   },
   clarificationBox: {
     marginTop: 8,
@@ -879,18 +877,18 @@ const styles = StyleSheet.create({
   },
   clarificationTitle: {
     color: '#fcd34d',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     marginBottom: 4,
   },
   clarificationQuestion: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     marginBottom: 2,
   },
   proposalNote: {
-    fontSize: 10,
+    fontSize: 13,
     color: '#f59e0b',
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -913,7 +911,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   actionId: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     color: '#38bdf8',
     fontFamily: 'monospace',
@@ -931,7 +929,7 @@ const styles = StyleSheet.create({
   },
   confirmBadgeText: {
     color: '#fed7aa',
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '700',
   },
   actionStatusBadge: {
@@ -950,26 +948,26 @@ const styles = StyleSheet.create({
   },
   actionStatusText: {
     color: '#ffffff',
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '700',
   },
   actionFieldLabel: {
     width: 90,
-    fontSize: 11,
+    fontSize: 13,
     color: '#94a3b8',
   },
   actionAgent: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
     color: '#a78bfa',
   },
   actionOperation: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     color: '#34d399',
   },
   actionFieldVal: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#cbd5e1',
   },
   actionClarifyBox: {
@@ -980,7 +978,7 @@ const styles = StyleSheet.create({
   },
   actionClarifyText: {
     color: '#fcd34d',
-    fontSize: 11,
+    fontSize: 13,
   },
   actionDataBox: {
     marginTop: 4,
@@ -989,12 +987,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   actionDataLabel: {
-    fontSize: 10,
+    fontSize: 13,
     color: '#64748b',
     marginBottom: 2,
   },
   actionDataJson: {
-    fontSize: 10,
+    fontSize: 13,
     color: '#94a3b8',
     fontFamily: 'monospace',
   },
@@ -1007,7 +1005,7 @@ const styles = StyleSheet.create({
     borderColor: '#475569',
   },
   toggleButtonText: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#cbd5e1',
     fontWeight: '600',
   },
@@ -1028,8 +1026,8 @@ const styles = StyleSheet.create({
   jsonText: {
     fontFamily: 'monospace',
     color: '#a5f3fc',
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 22,
   },
   calendarExecBox: {
     marginTop: 10,
@@ -1041,7 +1039,7 @@ const styles = StyleSheet.create({
   },
   calendarExecTitle: {
     color: '#38bdf8',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   calendarExecBadge: {
@@ -1061,7 +1059,7 @@ const styles = StyleSheet.create({
   },
   calendarExecBadgeText: {
     color: '#f8fafc',
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '700',
   },
   execDetails: {
@@ -1070,8 +1068,8 @@ const styles = StyleSheet.create({
   },
   execMessage: {
     color: '#cbd5e1',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 22,
   },
   execMetaRow: {
     flexDirection: 'row',
@@ -1080,11 +1078,11 @@ const styles = StyleSheet.create({
   },
   execMetaLabel: {
     color: '#94a3b8',
-    fontSize: 11,
+    fontSize: 13,
   },
   execMetaVal: {
     color: '#f8fafc',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   verifiedTrue: {
@@ -1101,7 +1099,7 @@ const styles = StyleSheet.create({
   },
   duplicateNoticeText: {
     color: '#fde047',
-    fontSize: 11,
+    fontSize: 13,
   },
   defaultsNotice: {
     backgroundColor: 'rgba(56, 189, 248, 0.15)',
@@ -1111,7 +1109,7 @@ const styles = StyleSheet.create({
   },
   defaultsNoticeText: {
     color: '#7dd3fc',
-    fontSize: 11,
+    fontSize: 13,
   },
   execBtn: {
     backgroundColor: '#0284c7',
@@ -1126,7 +1124,7 @@ const styles = StyleSheet.create({
   },
   execBtnText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   sourceBadgeContainer: {
@@ -1150,7 +1148,7 @@ const styles = StyleSheet.create({
   },
   sourceTagTextLabel: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   sourceAppTag: {
@@ -1163,7 +1161,7 @@ const styles = StyleSheet.create({
   },
   sourceAppText: {
     color: '#94a3b8',
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '600',
   },
 });

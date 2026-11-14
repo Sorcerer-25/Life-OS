@@ -21,6 +21,7 @@ export const LIFEOS_PACKAGE_NAMES = [
   'lifeos',
   'lifeos-temp',
   'host.exp.exponent',
+  'com.anonymous.lifeostemp',
 ];
 
 export interface NotificationSettings {
@@ -30,12 +31,108 @@ export interface NotificationSettings {
   offlineParserOnly: boolean; // Never send notification text to external LLM (default: true)
 }
 
-let currentSettings: NotificationSettings = {
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   captureEnabled: false,
   allowedApps: [], // Spec requirement: default allow-list must be empty
   retentionDays: 7,
   offlineParserOnly: true,
 };
+
+let currentSettings: NotificationSettings = { ...DEFAULT_NOTIFICATION_SETTINGS };
+let isLoaded = false;
+
+/**
+ * Persists current notification settings to SQLite database.
+ */
+export async function persistNotificationSettings(settings: NotificationSettings): Promise<void> {
+  try {
+    const SQLite = require('expo-sqlite');
+    const db = await SQLite.openDatabaseAsync('lifeos.db');
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS notification_settings (
+        id TEXT PRIMARY KEY,
+        capture_enabled INTEGER NOT NULL,
+        allowed_apps TEXT NOT NULL,
+        retention_days INTEGER NOT NULL,
+        offline_parser_only INTEGER NOT NULL
+      );
+    `);
+    await db.runAsync(
+      `INSERT OR REPLACE INTO notification_settings (id, capture_enabled, allowed_apps, retention_days, offline_parser_only)
+       VALUES ('default', ?, ?, ?, ?)`,
+      [
+        settings.captureEnabled ? 1 : 0,
+        JSON.stringify(settings.allowedApps),
+        settings.retentionDays,
+        settings.offlineParserOnly ? 1 : 0,
+      ]
+    );
+  } catch (err) {
+    // If SQLite fails (e.g. web or stripped test environment), fallback to in-memory
+  }
+}
+
+/**
+ * Loads persisted notification settings on app launch.
+ * If SQLite has no record yet, attempts to recover any existing native Android SharedPreferences settings.
+ */
+export async function loadNotificationSettings(): Promise<NotificationSettings> {
+  try {
+    const SQLite = require('expo-sqlite');
+    const db = await SQLite.openDatabaseAsync('lifeos.db');
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS notification_settings (
+        id TEXT PRIMARY KEY,
+        capture_enabled INTEGER NOT NULL,
+        allowed_apps TEXT NOT NULL,
+        retention_days INTEGER NOT NULL,
+        offline_parser_only INTEGER NOT NULL
+      );
+    `);
+    const row = await db.getFirstAsync(
+      `SELECT capture_enabled, allowed_apps, retention_days, offline_parser_only FROM notification_settings WHERE id = 'default'`
+    );
+    if (row && typeof (row as any).capture_enabled !== 'undefined') {
+      let allowed: string[] = [];
+      try {
+        allowed = JSON.parse((row as any).allowed_apps || '[]');
+      } catch {
+        allowed = [];
+      }
+      currentSettings = {
+        captureEnabled: Boolean((row as any).capture_enabled),
+        allowedApps: Array.isArray(allowed) ? allowed : [],
+        retentionDays: Number((row as any).retention_days) || 7,
+        offlineParserOnly: Boolean((row as any).offline_parser_only),
+      };
+      isLoaded = true;
+      return getNotificationSettings();
+    }
+  } catch (err) {
+    // SQLite lookup error or environment without SQLite
+  }
+
+  // Fallback: Check if native Android SharedPreferences already has settings configured
+  try {
+    const { getSettingsFromNative } = require('./nativeNotificationListener');
+    const nativeSettings = await getSettingsFromNative();
+    if (nativeSettings && (nativeSettings.captureEnabled || nativeSettings.allowedApps.length > 0)) {
+      currentSettings = {
+        ...currentSettings,
+        captureEnabled: nativeSettings.captureEnabled,
+        allowedApps: nativeSettings.allowedApps,
+      };
+      await persistNotificationSettings(currentSettings);
+      isLoaded = true;
+      return getNotificationSettings();
+    }
+  } catch {
+    // Native module unavailable or error
+  }
+
+  isLoaded = true;
+  return getNotificationSettings();
+}
 
 export function getNotificationSettings(): NotificationSettings {
   return { ...currentSettings, allowedApps: [...currentSettings.allowedApps] };
@@ -47,6 +144,7 @@ export function updateNotificationSettings(updates: Partial<NotificationSettings
     ...updates,
     allowedApps: updates.allowedApps ? [...updates.allowedApps] : currentSettings.allowedApps,
   };
+  persistNotificationSettings(currentSettings).catch(() => {});
   return getNotificationSettings();
 }
 
@@ -67,20 +165,20 @@ export function addAppToAllowList(packageName: string): void {
   if (isLifeOSPackage(lower)) return;
   if (!currentSettings.allowedApps.includes(lower)) {
     currentSettings.allowedApps.push(lower);
+    persistNotificationSettings(currentSettings).catch(() => {});
   }
 }
 
 export function removeAppFromAllowList(packageName: string): void {
   const lower = packageName.toLowerCase();
   currentSettings.allowedApps = currentSettings.allowedApps.filter((p) => p !== lower);
+  persistNotificationSettings(currentSettings).catch(() => {});
 }
 
 export function resetNotificationSettings(): void {
   currentSettings = {
-    captureEnabled: false,
+    ...DEFAULT_NOTIFICATION_SETTINGS,
     allowedApps: [],
-    retentionDays: 7,
-    offlineParserOnly: true,
   };
+  persistNotificationSettings(currentSettings).catch(() => {});
 }
-

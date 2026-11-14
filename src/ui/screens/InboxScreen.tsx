@@ -1,13 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScalePressable, animateLayout, Entrance } from '../components/core/Motion';
+import { SuccessFeedback } from '../components/core/SuccessFeedback';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, UIManager, View } from 'react-native';
 import { ActionPlan } from '../../models/ActionPlan';
 import { NotificationInboxItem, NotificationInboxStatus } from '../../models/NotificationEvent';
 import { NotificationProcessor } from '../../notifications/notificationProcessor';
@@ -17,10 +11,15 @@ import { AppHeader } from '../components/core/AppHeader';
 import { BottomSheet } from '../components/core/BottomSheet';
 import { ConfirmationDialog } from '../components/core/ConfirmationDialog';
 import { EmptyState } from '../components/core/EmptyState';
+import { Icon } from '../components/core/Icon';
 import { LoadingState } from '../components/core/LoadingState';
 import { PrimaryButton } from '../components/core/PrimaryButton';
 import { ScreenContainer } from '../components/core/ScreenContainer';
 import { SecondaryButton } from '../components/core/SecondaryButton';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface InboxScreenProps {
   processor: NotificationProcessor;
@@ -39,7 +38,7 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
   onClose,
   isModal = false,
 }) => {
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
   const [items, setItems] = useState<NotificationInboxItem[]>([]);
   const [counts, setCounts] = useState<Record<FilterTab, number>>({
@@ -53,6 +52,8 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
   const [statusFilter, setStatusFilter] = useState<FilterTab>('all');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [processingIds, setProcessingIds] = useState<Record<string, boolean>>({});
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showOverflowMenu, setShowOverflowMenu] = useState<boolean>(false);
 
   // Confirmation dialog state for Clear All
   const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
@@ -63,13 +64,17 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
   const [editDate, setEditDate] = useState<string>('');
   const [editTime, setEditTime] = useState<string>('');
 
-  const loadItemsAndCounts = async () => {
+  const toggleOverflowMenu = () => {
+    animateLayout();
+    setShowOverflowMenu(!showOverflowMenu);
+  };
+
+  const loadItemsAndCounts = useCallback(async () => {
     setIsLoading(true);
     try {
       const repo = processor.getRepository();
       const all = await repo.listAll();
 
-      // Compute counts per category
       const newCounts: Record<FilterTab, number> = {
         all: all.length,
         new: 0,
@@ -86,7 +91,6 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
       });
       setCounts(newCounts);
 
-      // Filtered items
       if (statusFilter === 'all') {
         setItems(all);
       } else {
@@ -97,20 +101,21 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [processor, statusFilter]);
 
   useEffect(() => {
-    loadItemsAndCounts();
-  }, [statusFilter]);
+    let cancelled = false;
+    void Promise.resolve().then(() => { if (!cancelled) return loadItemsAndCounts(); });
+    return () => { cancelled = true; };
+  }, [loadItemsAndCounts]);
 
   const handleAnalyse = async (itemId: string) => {
     setProcessingIds((prev) => ({ ...prev, [itemId]: true }));
     try {
-      // Analysis never approves: it only performs deterministic understanding and planning
       await processor.analyzeInboxItem(itemId);
       await loadItemsAndCounts();
     } catch (err: any) {
-      Alert.alert('Analysis Notice', err?.message || 'Could not analyze notification.');
+      Alert.alert('Analysis Failed', err?.message || 'Failed to analyze notification.');
     } finally {
       setProcessingIds((prev) => ({ ...prev, [itemId]: false }));
     }
@@ -119,15 +124,15 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
   const handleApprove = async (itemId: string) => {
     setProcessingIds((prev) => ({ ...prev, [itemId]: true }));
     try {
-      const result = await processor.approveActionPlan(itemId);
-      if (result.success) {
-        Alert.alert('Action Plan Executed', 'Approved actions have been executed successfully.');
+      const res = await processor.approveActionPlan(itemId);
+      if (res.success) {
+        setSuccessMessage('Your plan has been reviewed and approved.');
       } else {
-        Alert.alert('Execution Incomplete', 'One or more approved actions failed to execute.');
+        Alert.alert('Execution Error', 'One or more actions could not be completed. Open Technical details for more information.');
       }
       await loadItemsAndCounts();
     } catch (err: any) {
-      Alert.alert('Approval Issue', err?.message || 'Could not approve action plan.');
+      Alert.alert('Execution Error', err?.message || 'Failed to approve plan.');
     } finally {
       setProcessingIds((prev) => ({ ...prev, [itemId]: false }));
     }
@@ -136,11 +141,10 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
   const handleDismiss = async (itemId: string) => {
     setProcessingIds((prev) => ({ ...prev, [itemId]: true }));
     try {
-      // Dismissed items never execute
       await processor.dismissNotification(itemId);
       await loadItemsAndCounts();
     } catch (err: any) {
-      Alert.alert('Dismiss Failed', err?.message || 'Could not dismiss notification.');
+      Alert.alert('Error', err?.message || 'Failed to dismiss notification.');
     } finally {
       setProcessingIds((prev) => ({ ...prev, [itemId]: false }));
     }
@@ -161,7 +165,6 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
   const handleSaveEdit = async () => {
     if (!editingItem || !editingItem.action_plan) return;
 
-    // Edits are re-validated before execution
     const modifiedActions = editingItem.action_plan.actions.map((act) => ({
       ...act,
       data: {
@@ -185,8 +188,9 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
     setProcessingIds((prev) => ({ ...prev, [targetId]: true }));
 
     try {
-      await processor.approveActionPlan(targetId, modifiedPlan);
-      Alert.alert('Approved with Edits', 'The edited action plan was executed successfully.');
+      const result = await processor.approveActionPlan(targetId, modifiedPlan);
+      if (result.success) setSuccessMessage('Your edited plan has been approved.');
+      else Alert.alert('Action incomplete', 'Some actions could not be completed. Review the result for details.');
       await loadItemsAndCounts();
     } catch (err: any) {
       Alert.alert('Execution Error', err?.message || 'Failed to execute edited plan.');
@@ -208,7 +212,7 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
     }
   };
 
-  const filterTabs: Array<{ key: FilterTab; label: string }> = [
+  const filterTabs: { key: FilterTab; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'new', label: 'New' },
     { key: 'analysed', label: 'Analysed' },
@@ -219,106 +223,123 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
 
   return (
     <ScreenContainer testID="inbox-screen">
+      {successMessage && <SuccessFeedback key={successMessage + items.map(item => item.updated_at).join()} label={successMessage} />}
       {/* Header */}
       <AppHeader
         title="Notification Inbox"
-        subtitle="Local SQLite inbox • User approval required before execution"
-        showStatusIndicator
-        statusLabel="Deterministic Engine"
-        onToggleTheme={toggleTheme}
-        onOpenSettings={onOpenSettings}
+        subtitle="Review alerts and choose what happens next."
         rightAction={
-          isModal && onClose ? (
-            <TouchableOpacity
-              style={[
-                styles.modalCloseBtn,
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {/* Overflow Menu Toggle */}
+            <ScalePressable style={[
+                styles.overflowToggleBtn,
                 {
-                  backgroundColor: theme.colors.surfaceSubtle,
+                  backgroundColor: showOverflowMenu ? theme.colors.surfaceElevated : theme.colors.surfaceSubtle,
                   borderColor: theme.colors.border,
                 },
               ]}
-              onPress={onClose}
+              onPress={toggleOverflowMenu}
               activeOpacity={0.7}
+              accessibilityLabel="Inbox actions overflow menu"
             >
-              <Text style={{ fontSize: 16 }}>✕</Text>
-            </TouchableOpacity>
-          ) : undefined
+              <Icon name="more-horizontal" size={18} color={theme.colors.textPrimary} />
+            </ScalePressable>
+
+            {isModal && onClose ? (
+              <ScalePressable style={[
+                  styles.overflowToggleBtn,
+                  {
+                    backgroundColor: theme.colors.surfaceSubtle,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
+                onPress={onClose}
+                activeOpacity={0.7}
+                accessibilityLabel="Close inbox modal"
+              >
+                <Icon name="x" size={18} color={theme.colors.textPrimary} />
+              </ScalePressable>
+            ) : null}
+          </View>
         }
       />
 
-      {/* Action Controls & Simulator Banner */}
-      <View style={styles.topControlRow}>
-        <View style={styles.leftButtons}>
-          <TouchableOpacity
-            style={[
-              styles.actionPill,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-              },
-            ]}
-            onPress={loadItemsAndCounts}
+      {/* Overflow Menu Dropdown (Secondary actions) */}
+      {showOverflowMenu && (
+        <View
+          style={[
+            styles.overflowCard,
+            {
+              backgroundColor: theme.colors.surfaceElevated,
+              borderColor: theme.colors.border,
+              borderRadius: theme.radii.md,
+            },
+          ]}
+        >
+          <ScalePressable style={styles.overflowItem}
+            onPress={() => {
+              setShowOverflowMenu(false);
+              loadItemsAndCounts();
+            }}
             activeOpacity={0.7}
           >
-            <Text style={[styles.actionPillText, { color: theme.colors.primaryLight }]}>
-              🔄 Refresh
+            <Icon name="refresh-cw" size={18} color={theme.colors.textPrimary} style={{ marginRight: 8 }} />
+            <Text style={[theme.typography.bodyMedium, { color: theme.colors.textPrimary }]}>
+              Refresh Records
             </Text>
-          </TouchableOpacity>
+          </ScalePressable>
 
           {onOpenSimulate && (
-            <TouchableOpacity
-              style={[
-                styles.actionPill,
-                {
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-              onPress={onOpenSimulate}
+            <ScalePressable style={[styles.overflowItem, { borderTopWidth: 1, borderTopColor: theme.colors.borderSubtle }]}
+              onPress={() => {
+                setShowOverflowMenu(false);
+                onOpenSimulate();
+              }}
               activeOpacity={0.7}
             >
-              <Text style={[styles.actionPillText, { color: theme.colors.accent }]}>
-                🔔 Simulate Alert
+              <Icon name="bell" size={18} color={theme.colors.agentReminder} style={{ marginRight: 8 }} />
+              <Text style={[theme.typography.bodyMedium, { color: theme.colors.textPrimary }]}>
+                Simulate Sample Notification
               </Text>
-            </TouchableOpacity>
+            </ScalePressable>
+          )}
+
+          {counts.all > 0 && (
+            <ScalePressable style={[styles.overflowItem, { borderTopWidth: 1, borderTopColor: theme.colors.borderSubtle }]}
+              onPress={() => {
+                setShowOverflowMenu(false);
+                setShowClearConfirm(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <Icon name="trash-2" size={18} color={theme.colors.error} style={{ marginRight: 8 }} />
+              <Text style={[theme.typography.bodyMedium, { color: theme.colors.error, fontWeight: '600' }]}>
+                Clear All Notifications
+              </Text>
+            </ScalePressable>
           )}
         </View>
+      )}
 
-        {counts.all > 0 && (
-          <TouchableOpacity
-            style={styles.clearAllBtn}
-            onPress={() => setShowClearConfirm(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={[theme.typography.caption, { color: theme.colors.errorForeground, fontWeight: '700' }]}>
-              🗑️ Clear All
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Status Filter Tabs */}
+      {/* Primary Focus: Filter Chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterScroll}
-        style={{ marginVertical: theme.spacing.sm }}
+        style={{ marginVertical: theme.spacing.xs }}
       >
         {filterTabs.map((tab) => {
           const isActive = statusFilter === tab.key;
           const count = counts[tab.key] || 0;
 
           return (
-            <TouchableOpacity
-              key={tab.key}
+            <ScalePressable key={tab.key}
               style={[
                 styles.filterChip,
                 {
-                  backgroundColor: isActive
-                    ? theme.colors.primary
-                    : theme.colors.surface,
-                  borderColor: isActive ? theme.colors.primaryLight : theme.colors.border,
-                  borderRadius: theme.radii.pill,
+                  backgroundColor: isActive ? theme.colors.surfaceSubtle : theme.colors.surface,
+                  borderColor: isActive ? theme.colors.textPrimary : theme.colors.border,
+                  borderRadius: theme.radii.md,
                 },
               ]}
               onPress={() => setStatusFilter(tab.key)}
@@ -328,8 +349,8 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
                 style={[
                   styles.filterText,
                   {
-                    color: isActive ? theme.colors.primaryForeground : theme.colors.textSecondary,
-                    fontWeight: isActive ? '700' : '600',
+                    color: isActive ? theme.colors.agentInbox : theme.colors.textSecondary,
+                    fontWeight: isActive ? '700' : '500',
                   },
                 ]}
               >
@@ -351,7 +372,7 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
                       styles.countBadgeText,
                       {
                         color: isActive
-                          ? theme.colors.primaryForeground
+                          ? theme.colors.agentInbox
                           : theme.colors.textTertiary,
                       },
                     ]}
@@ -360,17 +381,17 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
                   </Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </ScalePressable>
           );
         })}
       </ScrollView>
 
-      {/* Notifications List */}
+      {/* Primary Focus: Notifications List */}
       {isLoading ? (
-        <LoadingState message="Loading notification records from SQLite..." />
+        <LoadingState message="Loading notification records..." />
       ) : items.length === 0 ? (
         <EmptyState
-          icon="📭"
+          icon="inbox"
           title={
             statusFilter === 'all'
               ? 'No Notifications Stored'
@@ -378,15 +399,16 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
           }
           description={
             statusFilter === 'all'
-              ? 'Incoming notifications from allowed applications will be stored in on-device SQLite and displayed here.'
+              ? 'Alerts from apps you allow will appear here. Enable notification access in Settings.'
               : `No notification records found matching the '${statusFilter}' filter.`
           }
-          actionLabel={onOpenSimulate ? 'Simulate Sample Notification' : undefined}
-          onAction={onOpenSimulate}
+          actionLabel={onOpenSettings ? 'Set up notifications' : undefined}
+          onAction={onOpenSettings}
         />
       ) : (
-        <View style={{ gap: theme.spacing.sm }}>
-          {items.map((item) => (
+        <View style={{ gap: theme.spacing.sm, marginBottom: 80 }}>
+          {items.map((item, index) => (
+            <Entrance key={item.id} index={index}>
             <NotificationCard
               key={item.id}
               item={item}
@@ -396,160 +418,139 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
               onEdit={handleOpenEdit}
               onDismiss={handleDismiss}
             />
+            </Entrance>
           ))}
         </View>
       )}
 
-      {/* Confirmation Dialog for Clear All */}
+      {/* Action Plan Edit Bottom Sheet */}
+      <BottomSheet
+        visible={Boolean(editingItem)}
+        onClose={() => setEditingItem(null)}
+        title="Edit Proposed Action"
+      >
+        {editingItem && (
+          <View style={{ paddingBottom: theme.spacing.md }}>
+            <Text style={[theme.typography.caption, { color: theme.colors.textSecondary, marginBottom: 4 }]}>
+              Title / Summary
+            </Text>
+            <TextInput
+              style={[
+                styles.editInput,
+                {
+                  backgroundColor: theme.colors.surfaceSubtle,
+                  color: theme.colors.textPrimary,
+                  borderColor: theme.colors.border,
+                  borderRadius: theme.radii.sm,
+                  padding: theme.spacing.sm,
+                },
+                theme.typography.bodyMedium,
+              ]}
+              value={editTitle}
+              onChangeText={setEditTitle}
+              placeholder="Event title..."
+              placeholderTextColor={theme.colors.textMuted}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[theme.typography.caption, { color: theme.colors.textSecondary, marginBottom: 4 }]}>
+                  Date (YYYY-MM-DD)
+                </Text>
+                <TextInput
+                  style={[
+                    styles.editInput,
+                    {
+                      backgroundColor: theme.colors.surfaceSubtle,
+                      color: theme.colors.textPrimary,
+                      borderColor: theme.colors.border,
+                      borderRadius: theme.radii.sm,
+                      padding: theme.spacing.sm,
+                    },
+                    theme.typography.bodyMedium,
+                  ]}
+                  value={editDate}
+                  onChangeText={setEditDate}
+                  placeholder="2026-11-15"
+                  placeholderTextColor={theme.colors.textMuted}
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={[theme.typography.caption, { color: theme.colors.textSecondary, marginBottom: 4 }]}>
+                  Time (HH:MM)
+                </Text>
+                <TextInput
+                  style={[
+                    styles.editInput,
+                    {
+                      backgroundColor: theme.colors.surfaceSubtle,
+                      color: theme.colors.textPrimary,
+                      borderColor: theme.colors.border,
+                      borderRadius: theme.radii.sm,
+                      padding: theme.spacing.sm,
+                    },
+                    theme.typography.bodyMedium,
+                  ]}
+                  value={editTime}
+                  onChangeText={setEditTime}
+                  placeholder="15:00"
+                  placeholderTextColor={theme.colors.textMuted}
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <SecondaryButton label="Cancel" onPress={() => setEditingItem(null)} size="sm" />
+              <PrimaryButton
+                label="Save & Approve"
+                icon="check"
+                onPress={handleSaveEdit}
+                size="sm"
+              />
+            </View>
+          </View>
+        )}
+      </BottomSheet>
+
+      {/* Clear All Confirmation Dialog */}
       <ConfirmationDialog
         visible={showClearConfirm}
-        title="Clear All Notifications"
-        message="Are you sure you want to permanently delete all notification records from local SQLite? This cannot be undone."
+        title="Clear All Notifications?"
+        message="This will delete all stored notification records from your on-device SQLite database. This action cannot be undone."
         confirmLabel="Clear All"
-        cancelLabel="Cancel"
         isDestructive
         onConfirm={handleClearAllConfirm}
         onCancel={() => setShowClearConfirm(false)}
       />
-
-      {/* Edit Action Plan BottomSheet */}
-      {editingItem && (
-        <BottomSheet
-          visible={true}
-          title="Edit Proposed Action"
-          subtitle="Modify fields before approving execution"
-          onClose={() => setEditingItem(null)}
-          footer={
-            <View style={styles.editFooterRow}>
-              <View style={{ flex: 1 }}>
-                <SecondaryButton
-                  label="Cancel"
-                  onPress={() => setEditingItem(null)}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <PrimaryButton
-                  label="Save & Approve"
-                  icon="✓"
-                  onPress={handleSaveEdit}
-                  isLoading={Boolean(processingIds[editingItem.id])}
-                />
-              </View>
-            </View>
-          }
-        >
-          <View style={{ gap: theme.spacing.md }}>
-            <View>
-              <Text style={[theme.typography.label, { color: theme.colors.textSecondary, marginBottom: 4 }]}>
-                Title / Description:
-              </Text>
-              <TextInput
-                style={[
-                  styles.editInput,
-                  {
-                    backgroundColor: theme.colors.surfaceSubtle,
-                    color: theme.colors.textPrimary,
-                    borderColor: theme.colors.border,
-                    borderRadius: theme.radii.sm,
-                    padding: theme.spacing.md,
-                  },
-                  theme.typography.bodyLarge,
-                ]}
-                value={editTitle}
-                onChangeText={setEditTitle}
-                placeholder="e.g. Electricity bill payment"
-                placeholderTextColor={theme.colors.textMuted}
-              />
-            </View>
-
-            <View>
-              <Text style={[theme.typography.label, { color: theme.colors.textSecondary, marginBottom: 4 }]}>
-                Due Date (YYYY-MM-DD):
-              </Text>
-              <TextInput
-                style={[
-                  styles.editInput,
-                  {
-                    backgroundColor: theme.colors.surfaceSubtle,
-                    color: theme.colors.textPrimary,
-                    borderColor: theme.colors.border,
-                    borderRadius: theme.radii.sm,
-                    padding: theme.spacing.md,
-                  },
-                  theme.typography.bodyLarge,
-                ]}
-                value={editDate}
-                onChangeText={setEditDate}
-                placeholder="e.g. 2026-11-04"
-                placeholderTextColor={theme.colors.textMuted}
-              />
-            </View>
-
-            <View>
-              <Text style={[theme.typography.label, { color: theme.colors.textSecondary, marginBottom: 4 }]}>
-                Start Time (HH:MM):
-              </Text>
-              <TextInput
-                style={[
-                  styles.editInput,
-                  {
-                    backgroundColor: theme.colors.surfaceSubtle,
-                    color: theme.colors.textPrimary,
-                    borderColor: theme.colors.border,
-                    borderRadius: theme.radii.sm,
-                    padding: theme.spacing.md,
-                  },
-                  theme.typography.bodyLarge,
-                ]}
-                value={editTime}
-                onChangeText={setEditTime}
-                placeholder="e.g. 15:00"
-                placeholderTextColor={theme.colors.textMuted}
-              />
-            </View>
-          </View>
-        </BottomSheet>
-      )}
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  modalCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  overflowToggleBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
-  topControlRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  leftButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+  overflowCard: {
     borderWidth: 1,
+    paddingVertical: 4,
+    marginBottom: 8,
   },
-  actionPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  clearAllBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 8,
+  overflowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   filterScroll: {
-    gap: 6,
-    paddingRight: 10,
+    gap: 8,
+    paddingVertical: 4,
+    paddingRight: 8,
   },
   filterChip: {
     flexDirection: 'row',
@@ -560,23 +561,18 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   filterText: {
-    fontSize: 12,
+    fontSize: 13,
   },
   countBadge: {
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 1,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   countBadgeText: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '800',
-  },
-  editFooterRow: {
-    flexDirection: 'row',
-    gap: 12,
   },
   editInput: {
     borderWidth: 1,
   },
 });
-

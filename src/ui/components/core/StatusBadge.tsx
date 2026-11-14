@@ -49,7 +49,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
           bg: theme.colors.successSurface,
           border: theme.colors.successBorder,
           text: theme.colors.successForeground,
-          defaultLabel: s === 'in_provider' ? '✓ IN PROVIDER' : s.toUpperCase(),
+          defaultLabel: s === 'in_provider' ? 'IN PROVIDER' : s.toUpperCase(),
         };
 
       case 'partial':
@@ -68,7 +68,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
           bg: theme.colors.warningSurface,
           border: theme.colors.warningBorder,
           text: theme.colors.warningForeground,
-          defaultLabel: '❓ CLARIFICATION NEEDED',
+          defaultLabel: 'Details needed',
         };
 
       case 'new':
@@ -84,10 +84,10 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       case 'confirmation req':
       case 'confirmation_req':
         return {
-          bg: 'rgba(234, 88, 12, 0.12)',
-          border: 'rgba(234, 88, 12, 0.35)',
-          text: '#FB923C',
-          defaultLabel: '⚠️ CONFIRMATION REQ',
+          bg: 'rgba(255, 197, 61, 0.12)',
+          border: 'rgba(255, 197, 61, 0.35)',
+          text: '#FFC53D',
+          defaultLabel: 'Review required',
         };
 
       case 'blocked':
@@ -122,7 +122,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       style={[
         styles.badge,
         {
-          backgroundColor: config.bg,
+          backgroundColor: 'transparent',
           borderColor: config.border,
           paddingVertical: size === 'sm' ? 2 : 4,
           paddingHorizontal: size === 'sm' ? 6 : 8,
@@ -136,7 +136,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
           styles.text,
           {
             color: config.text,
-            fontSize: size === 'sm' ? 10 : 11,
+            fontSize: size === 'sm' ? 12 : 13,
           },
         ]}
       >

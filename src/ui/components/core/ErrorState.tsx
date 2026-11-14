@@ -1,5 +1,7 @@
+import { ScalePressable, animateLayout } from './Motion';
+import { IconTile } from './IconTile';
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { useTheme } from '../../theme';
 import { SecondaryButton } from './SecondaryButton';
 
@@ -35,7 +37,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
       ]}
     >
       <View style={styles.headerRow}>
-        <Text style={styles.icon}>⚠️</Text>
+        <IconTile name="alert-circle" color={theme.colors.error} />
         <Text
           style={[
             theme.typography.titleSmall,
@@ -57,15 +59,14 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
 
       {technicalError && (
         <View style={{ marginTop: theme.spacing.sm }}>
-          <TouchableOpacity
-            onPress={() => setShowDetails(!showDetails)}
+          <ScalePressable onPress={() => { animateLayout(); setShowDetails(!showDetails); }}
             activeOpacity={0.7}
             style={styles.detailsToggle}
           >
             <Text style={[theme.typography.caption, { color: theme.colors.errorForeground }]}>
               {showDetails ? '▲ Hide raw error' : '▼ View technical details'}
             </Text>
-          </TouchableOpacity>
+          </ScalePressable>
 
           {showDetails && (
             <View

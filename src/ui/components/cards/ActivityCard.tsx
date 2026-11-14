@@ -1,6 +1,10 @@
+import { ScalePressable } from '../core/Motion';
+import { agentType as resolveAgent, humanLabel } from '../../presentation';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { useTheme } from '../../theme';
+import { Icon } from '../core/Icon';
+import { AgentType, IconTile } from '../core/IconTile';
 import { StatusBadge } from '../core/StatusBadge';
 
 export interface ActivityItemData {
@@ -12,6 +16,7 @@ export interface ActivityItemData {
   intents?: string[];
   agents?: string[];
   status: string;
+  scheduledAt?: string;
   timestamp: string;
 }
 
@@ -24,17 +29,19 @@ interface ActivityCardProps {
 export const ActivityCard: React.FC<ActivityCardProps> = ({ item, onPress, style }) => {
   const { theme } = useTheme();
 
-  const getSourceIcon = () => {
-    switch (item.sourceType) {
-      case 'voice':
-        return '🎤';
-      case 'notification':
-        return '🔔';
-      case 'text':
-      default:
-        return '⌨️';
-    }
-  };
+  // Resolve agent type
+  const agentType: AgentType = (() => {
+    const ag = item.agents?.[0]?.toLowerCase() || '';
+    if (ag.includes('calendar')) return 'calendar';
+    if (ag.includes('reminder')) return 'reminder';
+    if (ag.includes('task')) return 'task';
+    const int = item.intents?.[0]?.toLowerCase() || '';
+    if (int.includes('calendar') || int.includes('schedule') || int.includes('event')) return 'calendar';
+    if (int.includes('reminder')) return 'reminder';
+    if (int.includes('task')) return 'task';
+    if (int.includes('expense')) return 'expense';
+    return item.sourceType === 'voice' ? 'system' : 'inbox';
+  })();
 
   const formattedTime = (() => {
     try {
@@ -44,6 +51,28 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ item, onPress, style
       return item.timestamp;
     }
   })();
+
+  // Format activity headline by what happened
+  const getActionHeadline = () => {
+    const firstAgent = item.agents?.[0]?.toLowerCase() || '';
+    const firstIntent = item.intents?.[0]?.toLowerCase() || '';
+    if (firstAgent.includes('calendar') || firstIntent.includes('calendar') || firstIntent.includes('event')) {
+      return item.status === 'failed' ? 'Calendar action failed' : item.status === 'actioned' ? 'Calendar event added' : 'Calendar event planned';
+    }
+    if (firstAgent.includes('reminder') || firstIntent.includes('reminder')) {
+      return 'Reminder plan';
+    }
+    if (firstAgent.includes('task') || firstIntent.includes('task')) {
+      return 'Task plan';
+    }
+    if (firstIntent.includes('expense')) {
+      return 'Expense review';
+    }
+    return item.sourceType === 'notification' ? 'Notification received' : 'Request reviewed';
+  };
+
+  const actionHeadline = [getActionHeadline(), item.scheduledAt].filter(Boolean).join(' · ');
+  const originalMessage = actionHeadline !== item.title ? item.title : (item.description || '');
 
   const content = (
     <View
@@ -55,53 +84,57 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ item, onPress, style
           borderRadius: theme.radii.md,
           padding: theme.spacing.md,
         },
-        theme.shadows.sm,
         style,
       ]}
     >
       <View style={styles.topRow}>
         <View style={styles.sourceGroup}>
-          <Text style={styles.sourceIcon}>{getSourceIcon()}</Text>
-          <Text
-            style={[
-              theme.typography.caption,
-              { color: theme.colors.textSecondary, fontWeight: '700' },
-            ]}
-          >
-            {item.sourceApp || item.sourceType.toUpperCase()}
-          </Text>
+          <IconTile agent={agentType} size={30} iconSize={18} />
+          <View style={{ marginLeft: 8 }}>
+            <Text
+              style={[
+                theme.typography.caption,
+                { color: theme.colors.textSecondary, fontWeight: '700' },
+              ]}
+            >
+              {item.sourceApp || item.sourceType.toUpperCase()}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.rightHeader}>
-          <Text style={[theme.typography.caption, { color: theme.colors.textTertiary }]}>
+          <Text style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
             {formattedTime}
           </Text>
           <StatusBadge status={item.status} size="sm" />
         </View>
       </View>
 
+      {/* Main Headline: What happened */}
       <Text
         style={[
           theme.typography.titleSmall,
-          { color: theme.colors.textPrimary, marginTop: theme.spacing.xs },
+          { color: theme.colors.textPrimary, marginTop: theme.spacing.sm },
         ]}
         numberOfLines={2}
       >
-        {item.title}
+        {actionHeadline}
       </Text>
 
-      {item.description ? (
+      {/* Original message as smaller line underneath */}
+      {originalMessage ? (
         <Text
           style={[
-            theme.typography.bodySmall,
-            { color: theme.colors.textSecondary, marginTop: 2 },
+            theme.typography.bodyMedium,
+            { color: theme.colors.textSecondary, marginTop: 2, lineHeight: 20 },
           ]}
           numberOfLines={2}
         >
-          {item.description}
+          {originalMessage}
         </Text>
       ) : null}
 
+      {/* Tags row with line icons */}
       {(item.intents?.length || item.agents?.length) ? (
         <View style={[styles.tagsRow, { marginTop: theme.spacing.sm }]}>
           {item.intents?.map((intent, idx) => (
@@ -115,8 +148,9 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ item, onPress, style
                 },
               ]}
             >
-              <Text style={[styles.miniTagText, { color: theme.colors.primaryLight }]}>
-                🎯 {intent}
+              <Icon name="check" size={18} color={theme.colors.success} style={{ marginRight: 4 }} />
+              <Text style={[styles.miniTagText, { color: theme.colors.textPrimary }]}>
+                {humanLabel(intent)}
               </Text>
             </View>
           ))}
@@ -131,8 +165,9 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ item, onPress, style
                 },
               ]}
             >
-              <Text style={[styles.miniTagText, { color: theme.colors.accent }]}>
-                🤖 {agent}
+              <IconTile agent={resolveAgent(agent)} size={28} style={{ marginRight: 4 }} />
+              <Text style={[styles.miniTagText, { color: theme.colors.textPrimary }]}>
+                {humanLabel(agent)}
               </Text>
             </View>
           ))}
@@ -143,9 +178,9 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ item, onPress, style
 
   if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+      <ScalePressable onPress={onPress} activeOpacity={0.75}>
         {content}
-      </TouchableOpacity>
+      </ScalePressable>
     );
   }
 
@@ -165,10 +200,6 @@ const styles = StyleSheet.create({
   sourceGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-  },
-  sourceIcon: {
-    fontSize: 13,
   },
   rightHeader: {
     flexDirection: 'row',
@@ -181,14 +212,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   miniTag: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     borderWidth: 1,
   },
   miniTagText: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '600',
   },
 });
-

@@ -1,28 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Modal,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScalePressable } from './core/Motion';
+import React, { useEffect, useState, useCallback } from 'react';
+import { StyleSheet, Switch, Text, View } from 'react-native';
 import { CalendarAdapter } from '../../calendar/calendarAdapter';
-import {
-  formatCalendarSourceDescription,
-  getCalendarPreferences,
-  listWritableCalendars,
-  setSelectedCalendarId,
-  updateCalendarPreferences,
-} from '../../calendar/calendarSettings';
+import { formatCalendarSourceDescription, getCalendarPreferences, listWritableCalendars, setSelectedCalendarId, updateCalendarPreferences } from '../../calendar/calendarSettings';
 import { ExpoCalendarAdapter } from '../../calendar/expoCalendarAdapter';
-import {
-  CalendarInfo,
-  CalendarPermissionResponse,
-  CalendarPreferences,
-} from '../../calendar/types';
+import { CalendarInfo, CalendarPermissionResponse, CalendarPreferences } from '../../calendar/types';
 import { useTheme } from '../theme';
 import { BottomSheet } from './core/BottomSheet';
+import { Icon } from './core/Icon';
 import { LoadingState } from './core/LoadingState';
 import { PrimaryButton } from './core/PrimaryButton';
 import { StatusBadge } from './core/StatusBadge';
@@ -47,7 +32,7 @@ export const CalendarSettingsModal: React.FC<CalendarSettingsModalProps> = ({
   const [preferences, setPreferences] = useState<CalendarPreferences | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const perm = await adapter.getPermissionsAsync();
@@ -71,13 +56,13 @@ export const CalendarSettingsModal: React.FC<CalendarSettingsModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [adapter]);
 
   useEffect(() => {
     if (visible) {
-      loadData();
+      void Promise.resolve().then(loadData);
     }
-  }, [visible]);
+  }, [loadData, visible]);
 
   const handleRequestPermission = async () => {
     const res = await adapter.requestPermissionsAsync();
@@ -160,14 +145,14 @@ export const CalendarSettingsModal: React.FC<CalendarSettingsModalProps> = ({
               {permission?.status === 'denied_permanently' ? (
                 <PrimaryButton
                   label="Open Phone Settings"
-                  icon="⚙️"
+                  icon="x"
                   onPress={() => adapter.openSettingsAsync()}
                   size="sm"
                 />
               ) : (
                 <PrimaryButton
                   label="Grant Calendar Permission"
-                  icon="✓"
+                  icon="x"
                   onPress={handleRequestPermission}
                   size="sm"
                 />
@@ -207,15 +192,14 @@ export const CalendarSettingsModal: React.FC<CalendarSettingsModalProps> = ({
             writableCalendars.map((cal) => {
               const isSelected = preferences?.selectedCalendarId === cal.id;
               return (
-                <TouchableOpacity
-                  key={cal.id}
+                <ScalePressable key={cal.id}
                   style={[
                     styles.calItem,
                     {
                       backgroundColor: isSelected
-                        ? theme.colors.primaryMuted
+                        ? theme.colors.surfaceSubtle
                         : theme.colors.surfaceSubtle,
-                      borderColor: isSelected ? theme.colors.primaryLight : theme.colors.border,
+                      borderColor: isSelected ? theme.colors.textPrimary : theme.colors.border,
                       borderRadius: theme.radii.sm,
                       padding: theme.spacing.sm,
                     },
@@ -233,7 +217,7 @@ export const CalendarSettingsModal: React.FC<CalendarSettingsModalProps> = ({
                           <View
                             style={[
                               styles.primaryBadge,
-                              { backgroundColor: theme.colors.primaryLight },
+                              { backgroundColor: theme.colors.textPrimary },
                             ]}
                           >
                             <Text style={styles.primaryBadgeText}>PRIMARY</Text>
@@ -245,9 +229,13 @@ export const CalendarSettingsModal: React.FC<CalendarSettingsModalProps> = ({
                       </Text>
                     </View>
 
-                    <Text style={{ fontSize: 16 }}>{isSelected ? '🔘' : '⚪'}</Text>
+                    <Icon
+                      name={isSelected ? 'check-circle' : 'circle'}
+                      size={18}
+                      color={isSelected ? theme.colors.textPrimary : theme.colors.textTertiary}
+                    />
                   </View>
-                </TouchableOpacity>
+                </ScalePressable>
               );
             })
           )}
@@ -266,7 +254,7 @@ export const CalendarSettingsModal: React.FC<CalendarSettingsModalProps> = ({
             ]}
           >
             <Text style={[theme.typography.caption, { color: theme.colors.infoForeground, fontWeight: '700' }]}>
-              ℹ️ Google Account Sync Notice:
+               Google Account Sync Notice:
             </Text>
             <Text style={[theme.typography.caption, { color: theme.colors.textSecondary, marginTop: 2, lineHeight: 15 }]}>
               Writes directly to Android native CalendarProvider. Google Calendar cloud sync depends on Android account sync being active for that Google account on this device.
@@ -302,8 +290,8 @@ export const CalendarSettingsModal: React.FC<CalendarSettingsModalProps> = ({
             <Switch
               value={preferences?.createCalendarEventForTasks ?? false}
               onValueChange={handleToggleTaskSync}
-              trackColor={{ false: theme.colors.border, true: theme.colors.primaryDark }}
-              thumbColor={preferences?.createCalendarEventForTasks ? theme.colors.primaryLight : theme.colors.textMuted}
+              trackColor={{ false: theme.colors.border, true: theme.colors.textSecondary }}
+              thumbColor={preferences?.createCalendarEventForTasks ? theme.colors.textPrimary : theme.colors.textMuted}
             />
           </View>
 
@@ -326,8 +314,8 @@ export const CalendarSettingsModal: React.FC<CalendarSettingsModalProps> = ({
             <Switch
               value={preferences?.enableCalendarAlarms ?? false}
               onValueChange={handleToggleAlarms}
-              trackColor={{ false: theme.colors.border, true: theme.colors.primaryDark }}
-              thumbColor={preferences?.enableCalendarAlarms ? theme.colors.primaryLight : theme.colors.textMuted}
+              trackColor={{ false: theme.colors.border, true: theme.colors.textSecondary }}
+              thumbColor={preferences?.enableCalendarAlarms ? theme.colors.textPrimary : theme.colors.textMuted}
             />
           </View>
         </View>
@@ -361,7 +349,7 @@ const styles = StyleSheet.create({
   },
   primaryBadgeText: {
     color: '#ffffff',
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '800',
   },
   disclaimer: {

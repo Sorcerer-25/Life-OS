@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import androidx.core.app.NotificationManagerCompat
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -134,14 +135,9 @@ class LifeOSNotificationListenerModule(private val reactContext: ReactApplicatio
     fun requestRebind(promise: Promise) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                val service = LifeOSNotificationListenerService.activeListenerInstance
-                if (service != null) {
-                    service.requestRebind(ComponentName(reactContext, LifeOSNotificationListenerService::class.java))
-                } else {
-                    LifeOSNotificationListenerService.requestRebind(
-                        ComponentName(reactContext, LifeOSNotificationListenerService::class.java)
-                    )
-                }
+                NotificationListenerService.requestRebind(
+                    ComponentName(reactContext, LifeOSNotificationListenerService::class.java)
+                )
             }
             promise.resolve(true)
         } catch (e: Exception) {
@@ -169,6 +165,26 @@ class LifeOSNotificationListenerModule(private val reactContext: ReactApplicatio
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("UPDATE_SETTINGS_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun getSettings(promise: Promise) {
+        try {
+            val prefs = LifeOSNotificationListenerService.getPreferences(reactContext)
+            val captureEnabled = prefs.getBoolean(LifeOSNotificationListenerService.KEY_CAPTURE_ENABLED, false)
+            val allowedAppsSet = prefs.getStringSet(LifeOSNotificationListenerService.KEY_ALLOWED_APPS, emptySet()) ?: emptySet()
+            val appsArray = Arguments.createArray()
+            for (app in allowedAppsSet) {
+                appsArray.pushString(app)
+            }
+            val map = Arguments.createMap().apply {
+                putBoolean("captureEnabled", captureEnabled)
+                putArray("allowedApps", appsArray)
+            }
+            promise.resolve(map)
+        } catch (e: Exception) {
+            promise.reject("GET_SETTINGS_ERROR", e.message, e)
         }
     }
 
