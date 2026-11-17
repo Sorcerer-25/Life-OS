@@ -19,7 +19,8 @@
     "react-native-safe-area-context": "~5.11.1",
     "react-native-screens": "~4.30.1",
     "react-native-web": "^0.21.4",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "expo-secure-store": "~58.0.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

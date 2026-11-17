@@ -42,7 +42,13 @@
       "expo-speech-recognition",
       "./plugins/withNotificationListener",
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ]
     ],
     "extra": {
       "eas": {
